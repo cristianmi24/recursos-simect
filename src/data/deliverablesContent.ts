@@ -25,12 +25,12 @@ El sistema no opera como un simple repositorio pasivo ni como una caja negra aut
 ---
 
 ### 2. Usuarios y Roles del Sistema
-El sistema implementa un modelo de control de acceso y autoría basado en roles (RBAC) adaptado a la investigación educativa:
+Las funciones siguientes describen responsabilidades del equipo investigador, no cuentas separadas del software. La aplicación actual implementa dos roles: **Tutor** (formularios propios) y **Administración** (gestión del proyecto completo).
 
 - **Investigador Principal (Director Metodológico)**:
   - Aprueba cambios en la Matriz Maestra de Categorías y códigos.
   - Valida la concordancia inter-codificadores y aprueba los reportes analíticos finales.
-  - Supervisa el registro de consentimiento informado y la anonimización de sujetos.
+  - Supervisa el registro de consentimiento informado y el uso de seudónimos; el sistema no captura nombres reales ni puede revertir un seudónimo.
 - **Investigador de Campo / Observador**:
   - Registra sesiones de observación estructurada en tiempo real o diferido.
   - Documenta evidencias fácticas y notas contextuales sin emitir juicios categóricos prematuros.
@@ -61,8 +61,8 @@ El sistema implementa un modelo de control de acceso y autoría basado en roles 
 5. **Módulo de Reportes Analíticos (Report Engine)**:
    - Generación de 8 reportes temáticos estructurados con cadenas de citas textuales y bitácoras observacionales directas.
 6. **Módulo de Auditoría, Trazabilidad y Exportación**:
-   - Bitácora inmutable de cambios (quién, qué, cuándo y justificación metodológica).
-   - Anonimización/seudonimización reversible solo por investigadores autorizados.
+   - Bitácora de eventos generada por el servidor y sin edición o borrado desde la aplicación; no es inmutable frente al propietario de Neon ni sustituye copias de seguridad.
+   - Uso de seudónimos sin mecanismo de reidentificación. El texto libre aún puede identificar a participantes y debe revisarse.
    - Exportación estructurada (JSON, CSV, Markdown) para interoperabilidad con CAQDAS como ATLAS.ti, MAXQDA o NVivo.
 
 ---
@@ -134,8 +134,8 @@ Estas dimensiones se aplican sobre los fragmentos y categorías anteriores como 
     summary: 'Especifica la arquitectura de almacenamiento de datos garantizando la separación física y lógica entre el dato empírico primario y las interpretaciones hermenéuticas de los investigadores.',
     contentMarkdown: `### 1. Principio Arquitectónico de Doble Capa
 El modelo de datos implementa una separación inviolable entre:
-- **Capa Empírica Inmutable (Dato Bruto)**: Registros de campo, transcripciones directas, grabaciones y marcas temporales originales. Una vez guardado el registro de campo, el dato textual o conductual queda sellado con hash de integridad.
-- **Capa Analítica Flexible (Hermenéutica)**: Códigos asignados, citas vinculadas, reflexiones de triangulación, notas teóricas y acuerdos inter-jueces. Si se modifica o elimina una categoría del libro de códigos, **los fragmentos de datos brutos permanecen intactos**.
+- **Capa de formularios**: Respuestas y transcripciones almacenadas en Neon con acceso por rol y propietario. En esta versión no se calcula un hash ni se promete inmutabilidad; Administración puede actualizar o retirar una sesión, y la aplicación registra esos eventos.
+- **Capa analítica**: Categorías, fragmentos codificados y triangulaciones se guardan por separado en un estado administrativo versionado. La exportación y las copias de seguridad deben gestionarse como datos sensibles.
 
 ---
 
@@ -335,7 +335,7 @@ El modelo de datos implementa una separación inviolable entre:
 - Barra superior con métricas clave: Total de Sesiones, Registros por Instrumento (OBS, GF, E), Fragmentos Codificados, Grado de Cobertura de Categorías.
 - Filtros multifactoriales: Por instrumento, institución educativa, grado, fecha y seudónimo de estudiante.
 - Botón de creación rápida con selector de protocolo: Observación, Grupo Focal o Entrevista.
-- Conmutador de **Modo de Anonimización**: Oculta/enmascara datos sensibles o nombres reales con un solo clic.
+- Conmutador para mostrar u ocultar seudónimos en la exportación CSV de fragmentos; no anonimiza transcripciones ni reemplaza la revisión manual de texto identificable.
 
 #### 2. Formulario de Captura Dinámica de Instrumentos
 - Encabezado con metadatos de sesión (Institución, Grado, Código, Evaluador, Consentimiento de audio).
@@ -377,7 +377,7 @@ El modelo de datos implementa una separación inviolable entre:
 El sistema opera bajo los cuatro cánones fundamentales de la investigación cualitativa:
 - **Credibilidad (Validez Interna)**: Salvaguardada mediante la triangulación sistemática entre los 3 instrumentos y la verificación de miembros (member checking diferido).
 - **Transferibilidad (Validez Externa)**: Asegurada mediante la descripción contextual densa (*thick description*) de las instituciones, tareas y condiciones del STI.
-- **Consistencia / Dependabilidad (Confiabilidad)**: Garantizada por la pista de auditoría inmutable que registra quién codificó qué fragmento, en qué fecha y bajo qué definición de categoría.
+- **Consistencia / Dependabilidad (Confiabilidad)**: La bitácora de eventos y el estado versionado apoyan la trazabilidad, pero no garantizan por sí solos la confiabilidad ni son inmutables frente al propietario de la base de datos.
 - **Confirmabilidad (Objetividad Hermenéutica)**: Alcanzada mediante la separación estricta entre el dato bruto textual/conductual y las interpretaciones del investigador.
 
 ---

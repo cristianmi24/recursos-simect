@@ -21,45 +21,40 @@ export const SessionModal: React.FC<SessionModalProps> = ({
   existingSession,
   onClose
 }) => {
-  const { questions, addSession, updateSession, currentResearcher } = useProject();
+  const { questions, addSession, updateSession } = useProject();
 
   const [instrumentType, setInstrumentType] = useState<InstrumentType>(
     existingSession?.instrumentType || initialType
   );
-  const [instrumentCode, setInstrumentCode] = useState(
-    existingSession?.instrumentCode ||
-      `${initialType}-2026-${String(Math.floor(Math.random() * 900) + 100)}`
-  );
   const [date, setDate] = useState(
     existingSession?.date || new Date().toISOString().split('T')[0]
   );
-  const [institution, setInstitution] = useState(
-    existingSession?.institution || 'Institución Educativa Departamental San Martín'
-  );
-  const [grade, setGrade] = useState(existingSession?.grade || '10° Grado - Grupo B');
+  const [institution, setInstitution] = useState(existingSession?.institution || '');
+  const [grade, setGrade] = useState(existingSession?.grade || '');
   const [sessionNumber, setSessionNumber] = useState(
     existingSession?.sessionNumber || 1
   );
   const [stiVersionOrTask, setStiVersionOrTask] = useState(
-    existingSession?.stiVersionOrTask || 'Módulo de Falacias Lógicas y Argumentación Crítica v2.1'
+    existingSession?.stiVersionOrTask || ''
   );
   const [studentPseudonym, setStudentPseudonym] = useState(
-    existingSession?.studentPseudonym || (initialType !== 'GF' ? 'EST-10B-01' : '')
+    existingSession?.studentPseudonym || ''
   );
   const [participantPseudonymsText, setParticipantPseudonymsText] = useState(
-    existingSession?.participantPseudonyms?.join(', ') ||
-      'EST-10B-01, EST-10B-04, EST-10B-08, EST-10B-12, EST-10B-15'
+    existingSession?.participantPseudonyms?.join(', ') || ''
   );
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(
     existingSession?.sessionDurationMinutes || 45
   );
   const [recordingConsentApproved, setRecordingConsentApproved] = useState(
-    existingSession ? existingSession.recordingConsentApproved : true
+    existingSession?.recordingConsentApproved ?? false
   );
   const [audioRecordingRef, setAudioRecordingRef] = useState(
-    existingSession?.audioRecordingRef || 'REC-AUD-202610-01.m4a (Autorizado)'
+    existingSession?.audioRecordingRef || ''
   );
   const [notes, setNotes] = useState(existingSession?.notes || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Specific records state
   const [obsRecords, setObsRecords] = useState<Record<string, ObservationRecord>>(() => {
@@ -71,7 +66,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
         initial[q.id] = {
           questionId: q.id,
           observed: true,
-          scaleValue: q.options ? q.options[0] : 'Sí',
+          scaleValue: '',
           observableEvidence: '',
           contextualNotes: ''
         };
@@ -87,7 +82,12 @@ export const SessionModal: React.FC<SessionModalProps> = ({
       .forEach((q) => {
         initial[q.id] = {
           questionId: q.id,
-          turns: [],
+          turns: [{
+            id: `turn-init-${q.id}`,
+            participantPseudonym: '',
+            text: '',
+            contextualNotes: ''
+          }],
           moderatorNotes: ''
         };
       });
@@ -114,8 +114,9 @@ export const SessionModal: React.FC<SessionModalProps> = ({
     (q) => q.instrumentType === instrumentType
   );
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError('');
 
     const participantList =
       instrumentType === 'GF'
@@ -125,16 +126,13 @@ export const SessionModal: React.FC<SessionModalProps> = ({
             .filter(Boolean)
         : undefined;
 
-    const sessionPayload: ResearchSession = {
-      id: existingSession?.id || `ses-${Date.now()}`,
+    const sessionPayload = {
       instrumentType,
-      instrumentCode,
       date,
       institution,
       grade,
       sessionNumber: Number(sessionNumber),
       stiVersionOrTask,
-      researcherName: existingSession?.researcherName || currentResearcher,
       studentPseudonym: instrumentType !== 'GF' ? studentPseudonym.trim() : undefined,
       participantPseudonyms: participantList,
       sessionDurationMinutes:
@@ -142,19 +140,24 @@ export const SessionModal: React.FC<SessionModalProps> = ({
       recordingConsentApproved,
       audioRecordingRef: audioRecordingRef.trim() || undefined,
       notes,
-      createdAt: existingSession?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       observationRecords: instrumentType === 'OBS' ? obsRecords : undefined,
       focusGroupRecords: instrumentType === 'GF' ? gfRecords : undefined,
       interviewRecords: instrumentType === 'E' ? eRecords : undefined
     };
 
-    if (existingSession) {
-      updateSession(sessionPayload);
-    } else {
-      addSession(sessionPayload);
+    setIsSaving(true);
+    try {
+      if (existingSession) {
+        await updateSession({ ...existingSession, ...sessionPayload });
+      } else {
+        await addSession(sessionPayload);
+      }
+      onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'No se pudo guardar el registro.');
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
   const updateObsField = (
@@ -172,8 +175,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
   };
 
   const addGfTurn = (qId: string) => {
-    const defaultSpeaker =
-      participantPseudonymsText.split(',')[0]?.trim() || 'EST-10B-01';
+    const defaultSpeaker = participantPseudonymsText.split(',')[0]?.trim() || '';
     const newTurn: FocusGroupTurn = {
       id: `turn-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       participantPseudonym: defaultSpeaker,
@@ -255,7 +257,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                   : 'Entrevista Semiestructurada (5 Preguntas)'}
               </span>
               <span className="text-xs text-slate-600 font-mono font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                {instrumentCode}
+                {existingSession?.instrumentCode || 'Código asignado al guardar'}
               </span>
             </div>
             <h2 className="text-lg font-extrabold text-slate-900 mt-1">
@@ -279,8 +281,9 @@ export const SessionModal: React.FC<SessionModalProps> = ({
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Tipo de Instrumento</label>
+                <label htmlFor="admin-instrument-type" className="block text-slate-600 font-semibold mb-1">Tipo de Instrumento</label>
                 <select
+                  id="admin-instrument-type"
                   value={instrumentType}
                   onChange={(e) => setInstrumentType(e.target.value as InstrumentType)}
                   disabled={!!existingSession}
@@ -293,19 +296,21 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Código de Sesión</label>
+                <label htmlFor="admin-instrument-code" className="block text-slate-600 font-semibold mb-1">Código de Sesión</label>
                 <input
+                  id="admin-instrument-code"
                   type="text"
                   required
-                  value={instrumentCode}
-                  onChange={(e) => setInstrumentCode(e.target.value)}
+                  value={existingSession?.instrumentCode || 'Se asignará al guardar'}
+                  readOnly
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-mono font-bold focus:border-indigo-600 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Fecha de Aplicación</label>
+                <label htmlFor="admin-date" className="block text-slate-600 font-semibold mb-1">Fecha de Aplicación</label>
                 <input
+                  id="admin-date"
                   type="date"
                   required
                   value={date}
@@ -315,10 +320,12 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">No. de Sesión STI</label>
+                <label htmlFor="admin-session-number" className="block text-slate-600 font-semibold mb-1">No. de Sesión STI</label>
                 <input
+                  id="admin-session-number"
                   type="number"
                   min="1"
+                  max="10000"
                   required
                   value={sessionNumber}
                   onChange={(e) => setSessionNumber(Number(e.target.value))}
@@ -327,10 +334,12 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-slate-600 font-semibold mb-1">Institución Educativa</label>
+                <label htmlFor="admin-institution" className="block text-slate-600 font-semibold mb-1">Institución Educativa</label>
                 <input
+                  id="admin-institution"
                   type="text"
                   required
+                  maxLength={160}
                   value={institution}
                   onChange={(e) => setInstitution(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 outline-none"
@@ -338,10 +347,12 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Grado / Grupo</label>
+                <label htmlFor="admin-grade" className="block text-slate-600 font-semibold mb-1">Grado / Grupo</label>
                 <input
+                  id="admin-grade"
                   type="text"
                   required
+                  maxLength={120}
                   value={grade}
                   onChange={(e) => setGrade(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 outline-none"
@@ -349,23 +360,27 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">
+                <label htmlFor={instrumentType === 'GF' ? 'admin-session-duration' : 'admin-student-pseudonym'} className="block text-slate-600 font-semibold mb-1">
                   {instrumentType === 'GF'
                     ? 'Duración de la Sesión (min)'
                     : 'Seudónimo del Estudiante'}
                 </label>
                 {instrumentType === 'GF' ? (
                   <input
+                    id="admin-session-duration"
                     type="number"
-                    min="10"
+                    min="1"
+                    max="1440"
                     value={sessionDurationMinutes}
                     onChange={(e) => setSessionDurationMinutes(Number(e.target.value))}
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 outline-none"
                   />
                 ) : (
                   <input
+                    id="admin-student-pseudonym"
                     type="text"
                     required
+                    maxLength={80}
                     value={studentPseudonym}
                     onChange={(e) => setStudentPseudonym(e.target.value)}
                     placeholder="p. ej. EST-10B-04"
@@ -376,12 +391,14 @@ export const SessionModal: React.FC<SessionModalProps> = ({
 
               {instrumentType === 'GF' && (
                 <div className="sm:col-span-4">
-                  <label className="block text-slate-600 font-semibold mb-1">
+                  <label htmlFor="admin-participants" className="block text-slate-600 font-semibold mb-1">
                     Lista de Seudónimos de Participantes (separados por coma)
                   </label>
                   <input
+                    id="admin-participants"
                     type="text"
                     required
+                    maxLength={2500}
                     value={participantPseudonymsText}
                     onChange={(e) => setParticipantPseudonymsText(e.target.value)}
                     placeholder="EST-10B-01, EST-10B-04, EST-10B-08..."
@@ -391,12 +408,14 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               )}
 
               <div className="sm:col-span-2">
-                <label className="block text-slate-600 font-semibold mb-1">
+                <label htmlFor="admin-sti-task" className="block text-slate-600 font-semibold mb-1">
                   Módulo o Tarea del Tutor Inteligente (STI)
                 </label>
                 <input
+                  id="admin-sti-task"
                   type="text"
                   required
+                  maxLength={240}
                   value={stiVersionOrTask}
                   onChange={(e) => setStiVersionOrTask(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 outline-none"
@@ -404,11 +423,13 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-slate-600 font-semibold mb-1">
+                <label htmlFor="admin-audio-reference" className="block text-slate-600 font-semibold mb-1">
                   Referencia de Grabación de Audio / Archivo Seguro
                 </label>
                 <input
+                  id="admin-audio-reference"
                   type="text"
+                  maxLength={250}
                   value={audioRecordingRef}
                   onChange={(e) => setAudioRecordingRef(e.target.value)}
                   placeholder="p. ej. REC-AUD-202610-01.m4a (Autorizado)"
@@ -417,10 +438,11 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"
                 id="consentCheck"
+                required
                 checked={recordingConsentApproved}
                 onChange={(e) => setRecordingConsentApproved(e.target.checked)}
                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
@@ -451,7 +473,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                 const rec = obsRecords[q.id] || {
                   questionId: q.id,
                   observed: true,
-                  scaleValue: 'Sí',
+                  scaleValue: '',
                   observableEvidence: '',
                   contextualNotes: ''
                 };
@@ -507,32 +529,38 @@ export const SessionModal: React.FC<SessionModalProps> = ({
 
                     {isNotObs ? (
                       <div>
-                        <label className="block text-xs font-semibold text-amber-900 mb-1">
+                        <label htmlFor={`admin-obs-${q.id}-reason`} className="block text-xs font-semibold text-amber-900 mb-1">
                           Justificación de no observación (sin sesgo negativo):
                         </label>
                         <textarea
+                          id={`admin-obs-${q.id}-reason`}
                           rows={2}
+                          maxLength={1000}
                           value={rec.notObservedReason || ''}
                           onChange={(e) =>
                             updateObsField(q.id, 'notObservedReason', e.target.value)
                           }
                           placeholder="p. ej. No se emitieron pistas de error en esta sección..."
+                          required
                           className="w-full bg-white border border-amber-300 rounded-lg p-2 text-xs text-slate-800 outline-none"
                         />
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          <label htmlFor={`admin-obs-${q.id}-scale`} className="block text-xs font-semibold text-slate-700 mb-1">
                             Respuesta Prevista:
                           </label>
                           <select
-                            value={rec.scaleValue || (q.options ? q.options[0] : 'Sí')}
+                            id={`admin-obs-${q.id}-scale`}
+                            value={rec.scaleValue}
+                            required
                             onChange={(e) =>
                               updateObsField(q.id, 'scaleValue', e.target.value)
                             }
                             className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:border-indigo-600 outline-none font-medium"
                           >
+                            <option value="" disabled>Seleccione una respuesta…</option>
                             {q.options?.map((opt) => (
                               <option key={opt} value={opt}>
                                 {opt}
@@ -543,12 +571,14 @@ export const SessionModal: React.FC<SessionModalProps> = ({
 
                         <div className="md:col-span-2 space-y-2">
                           <div>
-                            <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                            <label htmlFor={`admin-obs-${q.id}-evidence`} className="block text-xs font-semibold text-emerald-800 mb-1">
                               Evidencia Concreta de la Conducta Observable:
                             </label>
                             <textarea
+                              id={`admin-obs-${q.id}-evidence`}
                               rows={2}
                               required
+                              maxLength={8000}
                               value={rec.observableEvidence}
                               onChange={(e) =>
                                 updateObsField(
@@ -563,11 +593,13 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                           </div>
 
                           <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            <label htmlFor={`admin-obs-${q.id}-notes`} className="block text-xs font-semibold text-slate-600 mb-1">
                               Notas Contextuales del Observador:
                             </label>
                             <input
+                              id={`admin-obs-${q.id}-notes`}
                               type="text"
+                              maxLength={3000}
                               value={rec.contextualNotes}
                               onChange={(e) =>
                                 updateObsField(
@@ -601,13 +633,13 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                     key={q.id}
                     className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-2xs"
                   >
-                    <div className="flex items-start justify-between border-b border-slate-100 pb-2">
-                      <div>
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-2">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                             {q.code}
                           </span>
-                          <h4 className="text-sm font-bold text-slate-900">
+                          <h4 className="break-words text-sm font-bold text-slate-900">
                             {q.prompt}
                           </h4>
                         </div>
@@ -616,7 +648,7 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                       <button
                         type="button"
                         onClick={() => addGfTurn(q.id)}
-                        className="flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-colors border border-amber-200"
+                        className="flex w-full items-center justify-center gap-1 px-3 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-colors border border-amber-200 sm:w-auto"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Añadir Intervención</span>
@@ -630,9 +662,12 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                           className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-2"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <input
-                              type="text"
-                              value={turn.participantPseudonym}
+                              <input
+                                type="text"
+                                required
+                                maxLength={80}
+                                aria-label={`Seudónimo de la intervención para ${q.code}`}
+                                value={turn.participantPseudonym}
                               onChange={(e) =>
                                 updateGfTurn(
                                   q.id,
@@ -645,6 +680,8 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                             />
                             <button
                               type="button"
+                              aria-label={`Eliminar intervención para ${q.code}`}
+                              disabled={rec.turns.length <= 1}
                               onClick={() => removeGfTurn(q.id, turn.id)}
                               className="text-slate-400 hover:text-rose-600 p-1"
                             >
@@ -655,6 +692,8 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                           <textarea
                             rows={2}
                             required
+                            maxLength={8000}
+                            aria-label={`Transcripción de intervención para ${q.code}`}
                             value={turn.text}
                             onChange={(e) =>
                               updateGfTurn(q.id, turn.id, 'text', e.target.value)
@@ -697,12 +736,14 @@ export const SessionModal: React.FC<SessionModalProps> = ({
 
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                        <label htmlFor={`admin-interview-${q.id}-response`} className="block text-xs font-semibold text-emerald-800 mb-1">
                           Respuesta Textual Verbatim:
                         </label>
                         <textarea
+                          id={`admin-interview-${q.id}-response`}
                           rows={3}
                           required
+                          maxLength={10000}
                           value={rec.verbatimResponse}
                           onChange={(e) =>
                             updateEField(q.id, 'verbatimResponse', e.target.value)
@@ -717,20 +758,23 @@ export const SessionModal: React.FC<SessionModalProps> = ({
               })}
           </div>
 
+          {saveError && <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900" role="alert">{saveError}</p>}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+              disabled={isSaving}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
-              <span>Guardar Registro</span>
+              <span>{isSaving ? 'Guardando en Neon…' : 'Guardar Registro'}</span>
             </button>
           </div>
         </form>

@@ -55,7 +55,6 @@ export interface ResearchSession {
   
   // Specific to OBS & E (individual):
   studentPseudonym?: string; // e.g. "EST-04"
-  studentRealNameEncrypted?: string; // Optional pseudonymized link
   
   // Specific to GF:
   participantPseudonyms?: string[]; // e.g. ["EST-01", "EST-03", "EST-07", "EST-09"]
@@ -72,6 +71,11 @@ export interface ResearchSession {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ResearchSessionDraft = Omit<
+  ResearchSession,
+  'id' | 'instrumentCode' | 'researcherName' | 'createdAt' | 'updatedAt'
+> & Partial<Pick<ResearchSession, 'id' | 'instrumentCode' | 'researcherName' | 'createdAt' | 'updatedAt'>>;
 
 export type CategoryFamily = 'EXP' | 'PER' | 'DIF' | 'PC' | 'META';
 
@@ -151,7 +155,7 @@ export interface TriangulationMatrixEntry {
 export interface AuditLogEntry {
   id: string;
   timestamp: string;
-  action: 'create_session' | 'update_session' | 'create_category' | 'update_category' | 'create_code' | 'review_code' | 'triangulate' | 'export_data' | 'system_reset';
+  action: 'create_session' | 'update_session' | 'delete_session' | 'create_category' | 'update_category' | 'create_code' | 'review_code' | 'triangulate' | 'export_data' | 'system_reset';
   entityType: 'session' | 'category' | 'coded_fragment' | 'triangulation' | 'system';
   entityId: string;
   researcher: string;

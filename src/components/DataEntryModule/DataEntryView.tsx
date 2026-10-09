@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useProject } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   InstrumentType,
   ResearchSession,
   ObservationRecord,
   FocusGroupRecord,
   InterviewRecord,
-  FocusGroupTurn
+  FocusGroupTurn,
+  ResearchSessionDraft
 } from '../../types';
 import {
   Send,
@@ -28,6 +30,7 @@ import {
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
 
 export const DataEntryView: React.FC = () => {
+  const { user } = useAuth();
   const {
     questions,
     addSession,
@@ -41,15 +44,15 @@ export const DataEntryView: React.FC = () => {
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>('OBS');
 
   // Metadata form
-  const [institution, setInstitution] = useState('Institución Educativa Departamental San Martín');
-  const [grade, setGrade] = useState('10° Grado - Grupo B');
+  const [institution, setInstitution] = useState('');
+  const [grade, setGrade] = useState('');
   const [sessionNumber, setSessionNumber] = useState<number>(1);
-  const [studentPseudonym, setStudentPseudonym] = useState('EST-10B-01');
-  const [stiTask, setStiTask] = useState('Módulo de Falacias Lógicas y Argumentación Crítica v2.1');
+  const [studentPseudonym, setStudentPseudonym] = useState('');
+  const [stiTask, setStiTask] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [consentApproved, setConsentApproved] = useState(true);
-  const [audioRef, setAudioRef] = useState('REC-2026-AUT.m4a (Autorizado)');
-  const [participantsText, setParticipantsText] = useState('EST-10B-01, EST-10B-04, EST-10B-08');
+  const [consentApproved, setConsentApproved] = useState(false);
+  const [audioRef, setAudioRef] = useState('');
+  const [participantsText, setParticipantsText] = useState('');
 
   // Specific response states
   const [obsData, setObsData] = useState<Record<string, ObservationRecord>>(() => {
@@ -60,7 +63,7 @@ export const DataEntryView: React.FC = () => {
         init[q.id] = {
           questionId: q.id,
           observed: true,
-          scaleValue: q.options ? q.options[0] : 'Sí',
+          scaleValue: '',
           observableEvidence: '',
           contextualNotes: ''
         };
@@ -78,7 +81,7 @@ export const DataEntryView: React.FC = () => {
           turns: [
             {
               id: `t-init-${q.id}`,
-              participantPseudonym: 'EST-10B-01',
+              participantPseudonym: '',
               text: '',
               contextualNotes: ''
             }
@@ -105,6 +108,8 @@ export const DataEntryView: React.FC = () => {
   });
 
   const [submissionSuccess, setSubmissionSuccess] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewingSession, setViewingSession] = useState<ResearchSession | null>(null);
 
   const relevantQuestions = questions.filter((q) => q.instrumentType === selectedInstrument);
@@ -122,7 +127,7 @@ export const DataEntryView: React.FC = () => {
 
   // GF handlers
   const handleAddGfTurn = (qId: string) => {
-    const firstSpeaker = participantsText.split(',')[0]?.trim() || 'EST-10B-01';
+    const firstSpeaker = participantsText.split(',')[0]?.trim() || '';
     setGfData((prev) => ({
       ...prev,
       [qId]: {
@@ -178,22 +183,17 @@ export const DataEntryView: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmissionError('');
 
-    const randomSuffix = Math.floor(Math.random() * 899) + 100;
-    const sessionCode = `${selectedInstrument}-2026-${randomSuffix}`;
-
-    const newSession: ResearchSession = {
-      id: `ses-${Date.now()}`,
+    const newSession: ResearchSessionDraft = {
       instrumentType: selectedInstrument,
-      instrumentCode: sessionCode,
       date,
       institution,
       grade,
       sessionNumber: Number(sessionNumber),
       stiVersionOrTask: stiTask,
-      researcherName: currentResearcher,
       studentPseudonym: selectedInstrument !== 'GF' ? studentPseudonym.trim() : undefined,
       participantPseudonyms:
         selectedInstrument === 'GF'
@@ -205,21 +205,22 @@ export const DataEntryView: React.FC = () => {
       recordingConsentApproved: consentApproved,
       audioRecordingRef: audioRef,
       notes: 'Registro enviado mediante el Módulo de Entrega Directa de Respuestas.',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
       observationRecords: selectedInstrument === 'OBS' ? obsData : undefined,
       focusGroupRecords: selectedInstrument === 'GF' ? gfData : undefined,
       interviewRecords: selectedInstrument === 'E' ? eData : undefined
     };
 
-    addSession(newSession);
-    setSubmissionSuccess(sessionCode);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Reset some inputs for next delivery
-    setTimeout(() => {
-      setSubmissionSuccess(null);
-    }, 7000);
+    setIsSubmitting(true);
+    try {
+      const saved = await addSession(newSession);
+      setSubmissionSuccess(saved.instrumentCode);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.setTimeout(() => setSubmissionSuccess(null), 7000);
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'No se pudo guardar el formulario. Tus respuestas siguen disponibles en esta pantalla.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const mySessions = sessions.filter((s) => s.instrumentType === selectedInstrument);
@@ -243,27 +244,20 @@ export const DataEntryView: React.FC = () => {
             </p>
           </div>
 
-          {/* Quick link to Admin & Deliverables */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row lg:flex-col items-start gap-3 shrink-0">
-            <div>
-              <span className="text-xs font-bold text-slate-900 block">
-                ¿Desea ver los análisis y entregables?
-              </span>
-              <span className="text-[11px] text-slate-500 block">
-                Consulte los 8 Entregables y la Triangulación
-              </span>
+          {user?.role === 'admin' && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row lg:flex-col items-start gap-3 shrink-0">
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">¿Desea ver los análisis y entregables?</span>
+                <span className="text-[11px] text-slate-500 block">Consulte los 8 Entregables y la Triangulación</span>
+              </div>
+              <button
+                onClick={() => { setAppMode('admin'); setActiveTab('deliverables'); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors w-full justify-center"
+              >
+                <span>Ir al Módulo Administrador</span><ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setAppMode('admin');
-                setActiveTab('deliverables');
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors w-full justify-center"
-            >
-              <span>Ir al Módulo Administrador</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Instrument Selector Cards (3 options) */}
@@ -387,8 +381,9 @@ export const DataEntryView: React.FC = () => {
       </div>
 
       {/* Success Notification Alert */}
+      {submissionError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{submissionError}</div>}
       {submissionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center justify-between shadow-sm animate-in fade-in duration-300" role="status" aria-live="polite">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-emerald-200 flex items-center justify-center shrink-0">
               <CheckCircle2 className="w-5 h-5 text-emerald-700" />
@@ -430,12 +425,14 @@ export const DataEntryView: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="session-institution" className="block text-slate-700 font-semibold mb-1">
                 Institución Educativa:
               </label>
               <input
+                id="session-institution"
                 type="text"
                 required
+                maxLength={160}
                 value={institution}
                 onChange={(e) => setInstitution(e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none"
@@ -443,12 +440,14 @@ export const DataEntryView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="session-grade" className="block text-slate-700 font-semibold mb-1">
                 Grado / Grupo:
               </label>
               <input
+                id="session-grade"
                 type="text"
                 required
+                maxLength={120}
                 value={grade}
                 onChange={(e) => setGrade(e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none"
@@ -456,10 +455,11 @@ export const DataEntryView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="session-date" className="block text-slate-700 font-semibold mb-1">
                 Fecha de Aplicación:
               </label>
               <input
+                id="session-date"
                 type="date"
                 required
                 value={date}
@@ -469,12 +469,14 @@ export const DataEntryView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="session-number" className="block text-slate-700 font-semibold mb-1">
                 Número de Sesión STI:
               </label>
               <input
+                id="session-number"
                 type="number"
                 min="1"
+                max="10000"
                 required
                 value={sessionNumber}
                 onChange={(e) => setSessionNumber(Number(e.target.value))}
@@ -483,15 +485,17 @@ export const DataEntryView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor={selectedInstrument === 'GF' ? 'session-participants' : 'session-student-pseudonym'} className="block text-slate-700 font-semibold mb-1">
                 {selectedInstrument === 'GF'
                   ? 'Participantes del Grupo Focal (Seudónimos):'
                   : 'Seudónimo del Estudiante (Protección Ética):'}
               </label>
               {selectedInstrument === 'GF' ? (
                 <input
+                  id="session-participants"
                   type="text"
                   required
+                  maxLength={2500}
                   value={participantsText}
                   onChange={(e) => setParticipantsText(e.target.value)}
                   placeholder="EST-10B-01, EST-10B-04, EST-10B-08..."
@@ -499,8 +503,10 @@ export const DataEntryView: React.FC = () => {
                 />
               ) : (
                 <input
+                  id="session-student-pseudonym"
                   type="text"
                   required
+                  maxLength={80}
                   value={studentPseudonym}
                   onChange={(e) => setStudentPseudonym(e.target.value)}
                   placeholder="p. ej. EST-10B-04"
@@ -510,12 +516,14 @@ export const DataEntryView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label htmlFor="session-sti-task" className="block text-slate-700 font-semibold mb-1">
                 Módulo o Tarea del Tutor Inteligente:
               </label>
               <input
+                id="session-sti-task"
                 type="text"
                 required
+                maxLength={240}
                 value={stiTask}
                 onChange={(e) => setStiTask(e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 outline-none"
@@ -527,6 +535,7 @@ export const DataEntryView: React.FC = () => {
             <input
               type="checkbox"
               id="consentAgreement"
+              required
               checked={consentApproved}
               onChange={(e) => setConsentApproved(e.target.checked)}
               className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
@@ -560,7 +569,7 @@ export const DataEntryView: React.FC = () => {
               const rec = obsData[q.id] || {
                 questionId: q.id,
                 observed: true,
-                scaleValue: 'Sí',
+                scaleValue: '',
                 observableEvidence: '',
                 contextualNotes: ''
               };
@@ -615,12 +624,15 @@ export const DataEntryView: React.FC = () => {
 
                   {isNotObs ? (
                     <div>
-                      <label className="block text-xs font-semibold text-amber-900 mb-1">
+                      <label htmlFor={`obs-${q.id}-reason`} className="block text-xs font-semibold text-amber-900 mb-1">
                         Motivo por el cual no pudo observarse (sin considerarse respuesta negativa):
                       </label>
                       <textarea
+                        id={`obs-${q.id}-reason`}
                         rows={2}
+                        maxLength={1000}
                         value={rec.notObservedReason || ''}
+                        required
                         onChange={(e) =>
                           handleObsChange(q.id, 'notObservedReason', e.target.value)
                         }
@@ -631,16 +643,19 @@ export const DataEntryView: React.FC = () => {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        <label htmlFor={`obs-${q.id}-scale`} className="block text-xs font-semibold text-slate-700 mb-1">
                           Respuesta Prevista:
                         </label>
                         <select
-                          value={rec.scaleValue || (q.options ? q.options[0] : 'Sí')}
+                          id={`obs-${q.id}-scale`}
+                          value={rec.scaleValue}
+                          required
                           onChange={(e) =>
                             handleObsChange(q.id, 'scaleValue', e.target.value)
                           }
                           className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 focus:border-indigo-600 outline-none font-medium"
                         >
+                          <option value="" disabled>Seleccione una respuesta…</option>
                           {q.options?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -656,12 +671,14 @@ export const DataEntryView: React.FC = () => {
 
                       <div className="md:col-span-2 space-y-2">
                         <div>
-                          <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                          <label htmlFor={`obs-${q.id}-evidence`} className="block text-xs font-semibold text-emerald-800 mb-1">
                             Evidencia Concreta de la Conducta Observable (Dato Fáctico Objetivo):
                           </label>
                           <textarea
+                            id={`obs-${q.id}-evidence`}
                             rows={2}
                             required
+                            maxLength={8000}
                             value={rec.observableEvidence}
                             onChange={(e) =>
                               handleObsChange(q.id, 'observableEvidence', e.target.value)
@@ -672,11 +689,13 @@ export const DataEntryView: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          <label htmlFor={`obs-${q.id}-notes`} className="block text-xs font-semibold text-slate-600 mb-1">
                             Notas Contextuales del Observador:
                           </label>
                           <input
+                            id={`obs-${q.id}-notes`}
                             type="text"
+                            maxLength={3000}
                             value={rec.contextualNotes}
                             onChange={(e) =>
                               handleObsChange(q.id, 'contextualNotes', e.target.value)
@@ -702,13 +721,13 @@ export const DataEntryView: React.FC = () => {
                   key={q.id}
                   className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3"
                 >
-                  <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-                    <div>
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                           {q.code}
                         </span>
-                        <h4 className="text-sm font-bold text-slate-900">{q.prompt}</h4>
+                        <h4 className="break-words text-sm font-bold text-slate-900">{q.prompt}</h4>
                       </div>
                       {q.description && (
                         <p className="text-xs text-slate-600 mt-1">{q.description}</p>
@@ -718,7 +737,7 @@ export const DataEntryView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleAddGfTurn(q.id)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-semibold transition-colors"
+                      className="flex w-full items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-semibold transition-colors sm:w-auto"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Añadir Intervención</span>
@@ -738,6 +757,9 @@ export const DataEntryView: React.FC = () => {
                             </span>
                             <input
                               type="text"
+                              required
+                              maxLength={80}
+                              aria-label={`Seudónimo de la intervención ${tIdx + 1} para ${q.code}`}
                               value={turn.participantPseudonym}
                               onChange={(e) =>
                                 handleUpdateGfTurn(
@@ -755,6 +777,7 @@ export const DataEntryView: React.FC = () => {
                           {rec.turns.length > 1 && (
                             <button
                               type="button"
+                              aria-label={`Eliminar intervención ${tIdx + 1} de ${q.code}`}
                               onClick={() => handleRemoveGfTurn(q.id, turn.id)}
                               className="text-slate-400 hover:text-rose-600 p-1"
                               title="Eliminar intervención"
@@ -767,6 +790,8 @@ export const DataEntryView: React.FC = () => {
                         <textarea
                           rows={2}
                           required
+                          maxLength={8000}
+                          aria-label={`Transcripción de la intervención ${tIdx + 1} para ${q.code}`}
                           value={turn.text}
                           onChange={(e) =>
                             handleUpdateGfTurn(q.id, turn.id, 'text', e.target.value)
@@ -777,6 +802,8 @@ export const DataEntryView: React.FC = () => {
 
                         <input
                           type="text"
+                          maxLength={2000}
+                          aria-label={`Notas contextuales de la intervención ${tIdx + 1} para ${q.code}`}
                           value={turn.contextualNotes || ''}
                           onChange={(e) =>
                             handleUpdateGfTurn(
@@ -825,12 +852,14 @@ export const DataEntryView: React.FC = () => {
 
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                      <label htmlFor={`interview-${q.id}-response`} className="block text-xs font-semibold text-emerald-800 mb-1">
                         Respuesta Textual Íntegra (Transcripción Verbatim del Estudiante):
                       </label>
                       <textarea
+                        id={`interview-${q.id}-response`}
                         rows={3}
                         required
+                        maxLength={10000}
                         value={rec.verbatimResponse}
                         onChange={(e) => handleEChange(q.id, 'verbatimResponse', e.target.value)}
                         placeholder="Transcriba con fidelidad la respuesta oral del estudiante..."
@@ -840,11 +869,13 @@ export const DataEntryView: React.FC = () => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        <label htmlFor={`interview-${q.id}-probing`} className="block text-xs font-semibold text-slate-700 mb-1">
                           Preguntas de Profundización Realizadas (Repreguntas):
                         </label>
                         <input
+                          id={`interview-${q.id}-probing`}
                           type="text"
+                          maxLength={4000}
                           value={rec.probingQuestions || ''}
                           onChange={(e) => handleEChange(q.id, 'probingQuestions', e.target.value)}
                           placeholder="¿Qué repregunta formuló el investigador para profundizar?"
@@ -853,11 +884,13 @@ export const DataEntryView: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        <label htmlFor={`interview-${q.id}-notes`} className="block text-xs font-semibold text-slate-600 mb-1">
                           Notas Contextuales y Paraverbales:
                         </label>
                         <input
+                          id={`interview-${q.id}-notes`}
                           type="text"
+                          maxLength={3000}
                           value={rec.contextualNotes || ''}
                           onChange={(e) => handleEChange(q.id, 'contextualNotes', e.target.value)}
                           placeholder="Tono, seguridad, titubeos, entusiasmo..."
@@ -880,10 +913,11 @@ export const DataEntryView: React.FC = () => {
 
           <button
             type="submit"
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all shrink-0 cursor-pointer"
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all shrink-0 cursor-pointer disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
-            <span>Entregar y Registrar Respuestas</span>
+            <span>{isSubmitting ? 'Guardando en Neon…' : 'Entregar y Registrar Respuestas'}</span>
           </button>
         </div>
       </form>
@@ -900,16 +934,11 @@ export const DataEntryView: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={() => {
-              setAppMode('admin');
-              setActiveTab('intake');
-            }}
-            className="text-xs text-indigo-600 font-semibold hover:underline flex items-center gap-1"
-          >
-            <span>Ver todas las sesiones en el Administrador</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          {user?.role === 'admin' && (
+            <button onClick={() => { setAppMode('admin'); setActiveTab('intake'); }} className="text-xs text-indigo-600 font-semibold hover:underline flex items-center gap-1">
+              <span>Ver todas las sesiones en el Administrador</span><ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

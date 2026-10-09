@@ -33,6 +33,12 @@ export const AuditExportView: React.FC = () => {
   const [filterAction, setFilterAction] = useState<string>('ALL');
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
+  const csvCell = (value: unknown) => {
+    const content = String(value ?? '');
+    const safeContent = /^[\u0000-\u0020]*[=+\-@]/.test(content) ? `'${content}` : content;
+    return `"${safeContent.replace(/"/g, '""')}"`;
+  };
+
   const filteredLogs = auditLogs.filter((log) => {
     const matchesAction = filterAction === 'ALL' || log.action === filterAction;
     const matchesSearch =
@@ -70,19 +76,19 @@ export const AuditExportView: React.FC = () => {
     ];
 
     const rows = codedFragments.map((f) => [
-      `"${f.id}"`,
-      `"${f.sessionCode}"`,
-      `"${f.instrumentType}"`,
-      `"${f.questionId}"`,
-      `"${isPseudonymized ? f.participantPseudonym || 'EST-XX' : f.participantPseudonym || 'Confidencial'}"`,
-      `"${f.excerptText.replace(/"/g, '""')}"`,
-      `"${f.categoryIds.join(';')}"`,
-      `"${(f.transversalDimensionIds || []).join(';')}"`,
-      `"${f.justification.replace(/"/g, '""')}"`,
-      `"${f.status}"`,
-      `"${f.researcherName}"`,
-      `"${f.dateCoded}"`
-    ]);
+      f.id,
+      f.sessionCode,
+      f.instrumentType,
+      f.questionId,
+      isPseudonymized ? f.participantPseudonym || 'EST-XX' : '[OCULTO]',
+      f.excerptText,
+      f.categoryIds.join(';'),
+      (f.transversalDimensionIds || []).join(';'),
+      f.justification,
+      f.status,
+      f.researcherName,
+      f.dateCoded
+    ].map(csvCell));
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -97,13 +103,18 @@ export const AuditExportView: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 850 * 1024) {
+      setImportStatus('El archivo supera el tamaño máximo permitido de 850 KB.');
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
       const success = importProjectJson(content);
       if (success) {
-        setImportStatus('✅ Proyecto restaurado exitosamente desde el archivo JSON.');
+        setImportStatus('Se importaron las matrices analíticas; formularios y bitácora permanecen intactos.');
       } else {
         setImportStatus('❌ Error: El archivo no tiene el formato JSON válido del Sistema ROCAS.');
       }
@@ -123,11 +134,10 @@ export const AuditExportView: React.FC = () => {
               <span>Seguridad de Datos y Auditoría</span>
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>Trazabilidad Metodológica, Anonimización y Exportación</span>
+              <span>Trazabilidad Metodológica, Seudonimización y Exportación</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">
-              Pista inmutable de auditoría para cada registro, codificación y triangulación. Gestión de
-              privacidad ética (seudonimización de menores) y exportación para interoperabilidad con
+              Eventos de auditoría atribuidos por el servidor y sin edición desde la aplicación. La bitácora apoya la trazabilidad, pero no sustituye copias de seguridad ni una revisión del texto exportado. Exportación para interoperabilidad con
               software CAQDAS (ATLAS.ti, MAXQDA, NVivo).
             </p>
           </div>
@@ -162,29 +172,30 @@ export const AuditExportView: React.FC = () => {
                 <span>Protocolo de Seudonimización Ética (Menores de Edad)</span>
               </div>
               <p className="text-slate-600 leading-relaxed text-[11px]">
-                En cumplimiento con las normas éticas de investigación educativa, los nombres reales de los
-                estudiantes se almacenan de forma disociada mediante identificadores seudonimizados
-                (p. ej. <code>EST-10B-04</code>).
+                Captura únicamente seudónimos; no registres nombres reales. Revisa también el texto libre, que puede identificar a una persona por su contenido.
               </p>
             </div>
 
             <button
+              type="button"
               onClick={() => setIsPseudonymized(!isPseudonymized)}
+              aria-pressed={isPseudonymized}
+              title={isPseudonymized ? 'Ocultar seudónimos en el CSV' : 'Mostrar seudónimos en el CSV'}
               className={`px-3 py-1.5 rounded-lg font-bold shrink-0 text-xs transition-colors ${
                 isPseudonymized
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                   : 'bg-amber-100 text-amber-800 border border-amber-300'
               }`}
             >
-              {isPseudonymized ? 'Máscara: ACTIVA' : 'Máscara: INACTIVA'}
+                {isPseudonymized ? 'Seudónimos visibles' : 'Seudónimos ocultos'}
             </button>
           </div>
 
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-3">
             <div>
-              <div className="text-slate-900 font-bold mb-1">Restaurar Copia o Datos de Muestra</div>
+                <div className="text-slate-900 font-bold mb-1">Restaurar Matrices Analíticas</div>
               <p className="text-slate-600 text-[11px]">
-                Importe un archivo JSON previamente exportado o reinicie la base de datos a los casos de muestra iniciales.
+                  Importe categorías, fragmentos y triangulaciones. Por seguridad, las sesiones y la bitácora no se restauran desde archivos.
               </p>
             </div>
 
@@ -202,7 +213,7 @@ export const AuditExportView: React.FC = () => {
 
               <button
                 onClick={() => {
-                  if (confirm('¿Confirma reiniciar el sistema a los datos de muestra iniciales?')) {
+                  if (confirm('¿Reiniciar las matrices analíticas a la estructura de muestra? Las sesiones y la bitácora de auditoría se conservarán.')) {
                     resetToSampleData();
                   }
                 }}
@@ -246,6 +257,7 @@ export const AuditExportView: React.FC = () => {
               <option value="ALL">Todas las acciones</option>
               <option value="create_session">Creación de sesión</option>
               <option value="update_session">Actualización de sesión</option>
+              <option value="delete_session">Retiro de sesión</option>
               <option value="create_code">Codificación de fragmento</option>
               <option value="review_code">Revisión de codificación</option>
               <option value="create_category">Creación de categoría</option>

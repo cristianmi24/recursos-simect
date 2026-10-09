@@ -1,12 +1,14 @@
 {
-  "name": "react-example",
+  "name": "recursos-simect",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "concurrently -k -s first \"cross-env NODE_ENV=development tsx watch server.ts\" \"cross-env NODE_ENV=development vite --port=3000 --host=0.0.0.0\"",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "cross-env NODE_ENV=production tsx server.ts",
+    "users:create": "tsx scripts/provision-user.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },
@@ -20,17 +22,23 @@
     "vite": "^8.3.0",
     "express": "^4.21.2",
     "dotenv": "^17.2.3",
-    "motion": "^12.23.24"
+    "motion": "^12.23.24",
+    "@neondatabase/serverless": "^1.0.2",
+    "bcryptjs": "^3.0.2",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "@types/express": "^4.17.21",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0"
   }
 }

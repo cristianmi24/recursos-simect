@@ -65,7 +65,9 @@ export const InstrumentList: React.FC = () => {
 
   const handleDelete = (id: string, code: string) => {
     if (confirm(`¿Confirma eliminar la sesión ${code}? Esta acción es irreversible.`)) {
-      deleteSession(id);
+      void deleteSession(id).catch((error: unknown) => {
+        window.alert(error instanceof Error ? error.message : 'No se pudo eliminar la sesión.');
+      });
     }
   };
 

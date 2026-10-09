@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const loginDemo = useCallback((role: AuthRole) => {
-    if (!import.meta.env.DEV) throw new Error('El acceso de revisión solo está disponible en desarrollo.');
+    if (configured === true) throw new Error('El acceso de revisión solo está disponible cuando la autenticación real no está configurada.');
     setUser({
       id: `demo-${role}`,
       name: role === 'admin' ? 'Administración de prueba' : 'Tutor de prueba',
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     setConfigured(false);
     setStatus('ready');
-  }, []);
+  }, [configured]);
 
   const logout = useCallback(async () => {
     if (user?.demo) {

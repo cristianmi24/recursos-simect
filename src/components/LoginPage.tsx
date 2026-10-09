@@ -41,7 +41,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const showDemoAccess = import.meta.env.DEV && configured !== true;
+  const showDemoAccess = configured !== true;
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

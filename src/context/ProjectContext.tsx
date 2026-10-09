@@ -12,7 +12,7 @@ import type {
 } from '../types';
 import { INITIAL_QUESTIONS } from '../data/initialInstruments';
 import { INITIAL_CATEGORIES } from '../data/initialCategories';
-import { INITIAL_CODED_FRAGMENTS, INITIAL_TRIANGULATION_ENTRIES } from '../data/sampleDataset';
+import { INITIAL_AUDIT_LOGS, INITIAL_CODED_FRAGMENTS, INITIAL_TRIANGULATION_ENTRIES, SAMPLE_SESSIONS } from '../data/sampleDataset';
 
 export type ActiveTab =
   | 'intake'
@@ -124,6 +124,26 @@ function serializeAdminState(state: AdminProjectState): string {
   });
 }
 
+function createDemoAuditEntry(
+  user: AuthUser,
+  action: AuditLogEntry['action'],
+  entityType: AuditLogEntry['entityType'],
+  entityId: string,
+  summary: string,
+  details?: Record<string, unknown>
+): AuditLogEntry {
+  return {
+    id: `demo-${crypto.randomUUID()}`,
+    timestamp: new Date().toISOString(),
+    action,
+    entityType,
+    entityId,
+    researcher: user.name,
+    summary,
+    ...(details ? { details } : {})
+  };
+}
+
 export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUser; initialMode?: AppMode }> = ({
   children,
   user,
@@ -157,6 +177,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
       setDataError('');
       setPersistenceError('');
       saveBlockedRef.current = false;
+      if (user.demo) {
+        const demoAdminState: AdminProjectState = user.role === 'admin'
+          ? { categories: INITIAL_CATEGORIES, codedFragments: INITIAL_CODED_FRAGMENTS, triangulationEntries: INITIAL_TRIANGULATION_ENTRIES }
+          : { categories: [], codedFragments: [], triangulationEntries: [] };
+        setSessions(user.role === 'admin' ? SAMPLE_SESSIONS : []);
+        setSessionsTruncated(false);
+        setCategories(demoAdminState.categories);
+        setCodedFragments(demoAdminState.codedFragments);
+        setTriangulationEntries(demoAdminState.triangulationEntries);
+        setAuditLogs(user.role === 'admin' ? INITIAL_AUDIT_LOGS : []);
+        versionRef.current = 0;
+        baselineRef.current = serializeAdminState(demoAdminState);
+        setDataStatus('ready');
+        return;
+      }
       try {
         const sessionsPromise = requestJson<{ sessions: ResearchSession[]; total: number; truncated: boolean }>('/api/sessions');
         const adminStatePromise = user.role === 'admin'
@@ -196,10 +231,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
     };
     void load();
     return () => { cancelled = true; };
-  }, [user.id, user.role, retryCounter]);
+  }, [user.id, user.role, user.demo, retryCounter]);
 
   useEffect(() => {
-    if (user.role !== 'admin' || dataStatus !== 'ready' || saveBlockedRef.current) return;
+    if (user.demo || user.role !== 'admin' || dataStatus !== 'ready' || saveBlockedRef.current) return;
     const state: AdminProjectState = { categories, codedFragments, triangulationEntries };
     const snapshot = serializeAdminState(state);
     if (snapshot === baselineRef.current) return;
@@ -222,7 +257,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
       });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [categories, codedFragments, triangulationEntries, dataStatus, user.role]);
+  }, [categories, codedFragments, triangulationEntries, dataStatus, user.role, user.demo]);
 
   const retryData = () => setRetryCounter((current) => current + 1);
 
@@ -233,7 +268,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
     summary: string,
     details?: Record<string, unknown>
   ) => {
-    if (user.role !== 'admin' || dataStatus !== 'ready') return;
+    if (dataStatus !== 'ready' || (user.role !== 'admin' && !user.demo)) return;
+    if (user.demo) {
+      setAuditLogs((previous) => [createDemoAuditEntry(user, action, entityType, entityId, summary, details), ...previous].slice(0, 500));
+      return;
+    }
     void requestJson<{ auditEvent: AuditLogEntry }>('/api/admin/audit', {
       method: 'POST',
       body: JSON.stringify({ action, entityType, entityId, summary, details })
@@ -245,6 +284,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   };
 
   const addSession = async (session: ResearchSessionDraft): Promise<ResearchSession> => {
+    if (user.demo) {
+      const createdAt = new Date().toISOString();
+      const createdSession: ResearchSession = {
+        ...session,
+        id: session.id ?? `demo-${crypto.randomUUID()}`,
+        instrumentCode: session.instrumentCode ?? `${session.instrumentType}-${createdAt.slice(0, 10).replaceAll('-', '')}-${String(sessions.length + 1).padStart(3, '0')}`,
+        researcherName: session.researcherName ?? currentResearcher,
+        createdAt: session.createdAt ?? createdAt,
+        updatedAt: session.updatedAt ?? createdAt
+      };
+      setSessions((previous) => [createdSession, ...previous]);
+      setAuditLogs((previous) => [createDemoAuditEntry(user, 'create_session', 'session', createdSession.id, `Formulario de prueba guardado: ${createdSession.instrumentCode}`), ...previous].slice(0, 500));
+      return createdSession;
+    }
     const result = await requestJson<{ session: ResearchSession; auditEvent: AuditLogEntry | null }>('/api/sessions', {
       method: 'POST', body: JSON.stringify(session)
     });
@@ -254,6 +307,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   };
 
   const updateSession = async (session: ResearchSession): Promise<ResearchSession> => {
+    if (user.demo) {
+      const updatedSession = { ...session, updatedAt: new Date().toISOString() };
+      setSessions((previous) => previous.map((existing) => existing.id === updatedSession.id ? updatedSession : existing));
+      setAuditLogs((previous) => [createDemoAuditEntry(user, 'update_session', 'session', updatedSession.id, `Formulario de prueba actualizado: ${updatedSession.instrumentCode}`), ...previous].slice(0, 500));
+      return updatedSession;
+    }
     const result = await requestJson<{ session: ResearchSession; auditEvent: AuditLogEntry | null }>(`/api/sessions/${encodeURIComponent(session.id)}`, {
       method: 'PUT', body: JSON.stringify(session)
     });
@@ -263,6 +322,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   };
 
   const deleteSession = async (sessionId: string): Promise<void> => {
+    if (user.demo) {
+      const deletedSession = sessions.find((session) => session.id === sessionId);
+      setSessions((previous) => previous.filter((session) => session.id !== sessionId));
+      if (deletedSession) setAuditLogs((previous) => [createDemoAuditEntry(user, 'delete_session', 'session', sessionId, `Formulario de prueba retirado: ${deletedSession.instrumentCode}`), ...previous].slice(0, 500));
+      return;
+    }
     const result = await requestJson<{ ok: boolean; auditEvent: AuditLogEntry | null }>(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', body: '{}' });
     if (!result.ok) throw new Error('No se pudo eliminar la sesión.');
     setSessions((previous) => previous.filter((session) => session.id !== sessionId));

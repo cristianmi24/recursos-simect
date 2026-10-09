@@ -61,6 +61,7 @@ const Workspace: React.FC<{ user: AuthUser }> = ({ user }) => {
   return (
     <div className="workspace-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-600 selection:text-white">
       <Navigation />
+      {user.demo && <div className="demo-mode-banner" role="status"><strong>Modo de revisión local</strong><span>Los cambios son temporales, se mantienen solo en esta sesión y no se envían a Neon.</span></div>}
       <WorkspaceBreadcrumbs />
       <MainContent role={user.role} />
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">

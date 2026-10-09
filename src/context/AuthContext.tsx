@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: AuthRole;
+  demo?: boolean;
 }
 
 type AuthStatus = 'loading' | 'ready' | 'offline';
@@ -20,6 +21,7 @@ interface AuthContextValue {
   status: AuthStatus;
   configured: boolean | null;
   login: (role: AuthRole, email: string, password: string) => Promise<void>;
+  loginDemo: (role: AuthRole) => void;
   retrySession: () => Promise<void>;
   logout: () => Promise<boolean>;
 }
@@ -75,7 +77,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStatus('ready');
   }, []);
 
+  const loginDemo = useCallback((role: AuthRole) => {
+    if (!import.meta.env.DEV) throw new Error('El acceso de revisión solo está disponible en desarrollo.');
+    setUser({
+      id: `demo-${role}`,
+      name: role === 'admin' ? 'Administración de prueba' : 'Tutor de prueba',
+      email: role === 'admin' ? 'admin.demo@simect.local' : 'tutor.demo@simect.local',
+      role,
+      demo: true
+    });
+    setConfigured(false);
+    setStatus('ready');
+  }, []);
+
   const logout = useCallback(async () => {
+    if (user?.demo) {
+      setUser(null);
+      setStatus('ready');
+      return true;
+    }
     try {
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
@@ -89,11 +109,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       return false;
     }
-  }, []);
+  }, [user?.demo]);
 
   const value = useMemo(
-    () => ({ user, status, configured, login, retrySession: refreshSession, logout }),
-    [user, status, configured, login, refreshSession, logout]
+    () => ({ user, status, configured, login, loginDemo, retrySession: refreshSession, logout }),
+    [user, status, configured, login, loginDemo, refreshSession, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

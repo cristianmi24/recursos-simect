@@ -4,7 +4,8 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 
 ## Qué hace esta implementación
 
-- La página inicial es un inicio de sesión para **Tutor** y **Administración**. No hay registro público ni cuentas o contraseñas de prueba.
+- La página inicial es un inicio de sesión para **Tutor** y **Administración**. No hay registro público ni cuentas o contraseñas de prueba para la autenticación real.
+- Cuando se ejecuta `npm run dev` y Neon no está configurado, aparecen dos botones de **entrada rápida de revisión**. Abren perfiles locales de tutor o administración, cargan datos de ejemplo para administración y mantienen cualquier cambio solo en memoria; no consultan ni escriben en Neon. El modo está limitado al desarrollo, no aparece en la compilación de producción y los cambios se pierden al recargar.
 - El servidor valida correo, contraseña y rol; usa bcrypt (factor 12), limita intentos, crea una sesión opaca de ocho horas y solo guarda el hash SHA-256 del token en Neon. La cookie es `HttpOnly`, `SameSite=Strict` y, en producción, `Secure`.
 - Un tutor puede crear formularios y consultar solo los que creó su cuenta. La administración puede consultar, editar y retirar formularios de cualquier tutor.
 - La administración, los fragmentos codificados y las matrices de triangulación se cargan desde Neon y solo se modifican mediante rutas que vuelven a comprobar el rol en el servidor. El estado administrativo usa control de versión para no pisar silenciosamente cambios concurrentes.
@@ -27,7 +28,7 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 
    El comando solicita el nombre, correo, rol (`tutor` o `admin`) y contraseña dos veces, sin mostrarla mientras se escribe. La contraseña requiere al menos 12 caracteres y admite como máximo 72 bytes por el algoritmo bcrypt. Crea por lo menos una cuenta `admin`; no existe una contraseña predeterminada.
 
-8. Para desarrollo, coloca las variables correspondientes en un `.env` local excluido de Git. `npm run dev` inicia Vite en el puerto 3000 y la API Express en el 3001. Para producción, `npm run build` genera el frontend y `npm start` sirve la aplicación y la API desde Express.
+8. Para desarrollo con cuentas reales, coloca las variables correspondientes en un `.env` local excluido de Git. `npm run dev` inicia Vite en el puerto 3000 y la API Express en el 3001. Si no configuras Neon, puedes usar las entradas rápidas locales para revisar la interfaz. Para producción, `npm run build` genera el frontend y `npm start` sirve la aplicación y la API desde Express; las entradas rápidas no están disponibles.
 
 ## Protección y límites de los datos
 

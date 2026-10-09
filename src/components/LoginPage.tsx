@@ -34,13 +34,14 @@ const roleChoices: { id: AuthRole; title: string; description: string; Icon: typ
 ];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => {
-  const { login, retrySession } = useAuth();
+  const { login, loginDemo, retrySession } = useAuth();
   const [role, setRole] = useState<AuthRole>('tutor');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const showDemoAccess = import.meta.env.DEV && configured !== true;
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -162,7 +163,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
               <div className="auth-offline" role="status"><span className="auth-offline-indicator" aria-hidden="true" /><div><strong>Servicio de acceso no disponible</strong><p>Comprueba tu conexión e inténtalo de nuevo.</p><button type="button" onClick={() => void retrySession()}><RefreshCw size={13} aria-hidden="true" /> Reintentar conexión</button></div></div>
             )}
             {configured === false && (
-              <div className="auth-setup-note" role="status">El acceso todavía no está habilitado. Solicita a coordinación que active las cuentas autorizadas.</div>
+              <div className="auth-setup-note" role="status">La autenticación real de Neon no está configurada. Usa las entradas rápidas para revisar la interfaz; no son cuentas reales.</div>
             )}
 
             <button className="auth-submit" type="submit" disabled={busy || configured === false}>
@@ -170,6 +171,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
               {busy ? <span className="auth-spinner" aria-hidden="true" /> : <ArrowRight size={17} />}
             </button>
           </form>
+
+          {showDemoAccess && (
+            <section className="auth-demo-access" aria-label="Entradas rápidas de revisión">
+              <div className="auth-demo-heading">
+                <strong>Entrada rápida de revisión</strong>
+                <span>Sin conexión a Neon</span>
+              </div>
+              <div className="auth-demo-buttons">
+                <button type="button" className="auth-demo-button" onClick={() => loginDemo('admin')}>
+                  <ShieldCheck size={16} aria-hidden="true" />
+                  <span>Entrar como Administración</span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </button>
+                <button type="button" className="auth-demo-button auth-demo-button--tutor" onClick={() => loginDemo('tutor')}>
+                  <GraduationCap size={16} aria-hidden="true" />
+                  <span>Entrar como Tutor</span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </button>
+              </div>
+              <p>Modo de prueba local: los cambios se pierden al recargar y no se guardan en la base.</p>
+            </section>
+          )}
 
           <div className="auth-no-account"><span>¿No tienes una cuenta?</span> Solicita acceso a la coordinación.</div>
           <div className="auth-panel-security"><LockKeyhole size={13} /><span>Conexión protegida</span><span className="auth-security-separator">·</span><span>Tu sesión es privada</span></div>

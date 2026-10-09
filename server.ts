@@ -387,7 +387,6 @@ app.post('/api/sessions', writeLimiter, allowSameOrigin, async (req, res) => {
 app.put('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) => {
   const user = await requireUser(req, res);
   if (!user || !sql) return;
-  if (!requireAdmin(user, res)) return;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.id)) {
     res.status(400).json({ error: 'El identificador de sesión no es válido.' });
     return;
@@ -399,7 +398,7 @@ app.put('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) => 
   }
   try {
     const existingRows = await sql`
-      SELECT s.id, s.instrument_type, s.instrument_code, s.application_date,
+      SELECT s.id, s.owner_id, s.instrument_type, s.instrument_code, s.application_date,
              s.payload, s.created_at, s.updated_at, u.display_name AS owner_name
       FROM research_sessions AS s JOIN auth_users AS u ON u.id = s.owner_id
       WHERE s.id = ${req.params.id}::uuid LIMIT 1
@@ -407,6 +406,10 @@ app.put('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) => 
     const existing = existingRows[0] as Record<string, unknown> | undefined;
     if (!existing) {
       res.status(404).json({ error: 'No se encontró la sesión.' });
+      return;
+    }
+    if (user.role !== 'admin' && String(existing.owner_id) !== user.id) {
+      res.status(403).json({ error: 'Solo puedes editar formularios que enviaste desde tu cuenta.' });
       return;
     }
     const draft = validation.value;

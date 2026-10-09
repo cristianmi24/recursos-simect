@@ -175,7 +175,7 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
                           {isNotObs ? 'No observado' : rec.scaleValue}
                         </span>
 
-                        {!isNotObs && rec.observableEvidence && (
+                        {!isNotObs && rec.observableEvidence && onCodeFragmentDirectly && (
                           <button
                             onClick={() =>
                               handleSendToCoding(qId, rec.observableEvidence)
@@ -259,7 +259,7 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
                               <span className="text-amber-800 font-bold font-mono">
                                 {turn.participantPseudonym}:
                               </span>
-                              <button
+                              {onCodeFragmentDirectly && <button
                                 onClick={() =>
                                   handleSendToCoding(
                                     qId,
@@ -271,7 +271,7 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
                               >
                                 <Tag className="w-3 h-3" />
                                 <span>Codificar intervención</span>
-                              </button>
+                              </button>}
                             </div>
                             <p className="text-slate-800 leading-relaxed italic font-medium">
                               "{turn.text}"
@@ -326,7 +326,7 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
                         </h4>
                       </div>
 
-                      {rec.verbatimResponse && (
+                      {rec.verbatimResponse && onCodeFragmentDirectly && (
                         <button
                           onClick={() =>
                             handleSendToCoding(

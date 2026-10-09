@@ -341,7 +341,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
     const payload = {
       exportedAt: new Date().toISOString(),
       exportedBy: currentResearcher,
-      projectTitle: 'Investigación Cualitativa STI - Sistema ROCAS',
+      projectTitle: 'Investigación Cualitativa STI - SIMECT',
       categories,
       sessions,
       codedFragments,

@@ -163,7 +163,7 @@ export const DeliverablesView: React.FC = () => {
               <span>Dossier Metodológico Completo</span>
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>Entregables Metodológicos del Sistema ROCAS (1 al 8)</span>
+              <span>Entregables Metodológicos de SIMECT (1 al 8)</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">
               Consulte aquí la fundamentación y especificación formal de los 8 entregables metodológicos:
@@ -270,7 +270,7 @@ export const DeliverablesView: React.FC = () => {
 
           {/* Footer Navigation */}
           <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-            <span>SISTEMA ROCAS • Versión Metodológica Oficial 1.0</span>
+            <span>SIMECT • Versión Metodológica Oficial 1.0</span>
             <span className="text-indigo-600 font-semibold">
               Entregable {selectedDeliverable.number} de {DELIVERABLES_DATA.length}
             </span>

@@ -1,4 +1,4 @@
--- ROCAS: autenticación y datos de investigación para PostgreSQL/Neon.
+-- SIMECT: autenticación y datos de investigación para PostgreSQL/Neon.
 -- Ejecutar en la base Neon antes de habilitar cuentas. Es idempotente para tablas existentes.
 -- No contiene usuarios, contraseñas, datos reales ni claves de conexión.
 

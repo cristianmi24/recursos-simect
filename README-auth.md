@@ -1,4 +1,6 @@
-# Acceso y datos de ROCAS con Neon
+# Acceso y datos de SIMECT con Neon
+
+El nombre visible del producto es **SIMECT**. Se mantienen los identificadores históricos `rocas_*` del esquema y los roles para conservar compatibilidad; este cambio de marca no ejecuta ni requiere cambios en Neon.
 
 ## Qué hace esta implementación
 

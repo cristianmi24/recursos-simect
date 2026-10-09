@@ -635,5 +635,5 @@ const defaultPort = isProduction ? 3000 : 3001;
 const port = Number(process.env.PORT ?? defaultPort);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT debe ser un puerto válido.');
 app.listen(port, '0.0.0.0', () => {
-  console.log(`API ROCAS lista en el puerto ${port}${sql ? '' : ' (Neon sin configurar)'}.`);
+  console.log(`API SIMECT lista en el puerto ${port}${sql ? '' : ' (Neon sin configurar)'}.`);
 });

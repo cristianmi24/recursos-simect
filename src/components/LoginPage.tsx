@@ -59,12 +59,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
 
   return (
     <main className="auth-page">
-      <section className="auth-story" aria-label="Sistema ROCAS">
+      <section className="auth-story" aria-label="SIMECT">
         <div className="auth-story-shade" />
         <div className="auth-brand">
-          <div className="auth-mark" aria-hidden="true"><span>R</span><i /></div>
+          <div className="auth-mark" aria-hidden="true"><span>S</span><i /></div>
           <div>
-            <div className="auth-brand-name">ROCAS <span>STI</span></div>
+            <div className="auth-brand-name">SIMECT <span>STI</span></div>
             <div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div>
           </div>
         </div>
@@ -80,7 +80,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
 
         <div className="auth-story-foot">
           <span className="auth-secure-dot" />
-          <span>Acceso protegido · Sistema ROCAS</span>
+          <span>Acceso protegido · SIMECT</span>
           <span className="auth-foot-rule" />
           <span>STI / 2026</span>
         </div>
@@ -89,8 +89,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
       <section className="auth-panel">
         <div className="auth-panel-inner">
           <div className="auth-mobile-brand">
-            <div className="auth-mark" aria-hidden="true"><span>R</span><i /></div>
-            <div><div className="auth-brand-name">ROCAS <span>STI</span></div><div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div></div>
+            <div className="auth-mark" aria-hidden="true"><span>S</span><i /></div>
+            <div><div className="auth-brand-name">SIMECT <span>STI</span></div><div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div></div>
           </div>
           <div className="auth-panel-overline">PORTAL DE ACCESO <span>01 / 02</span></div>
           <h2>Bienvenido<span className="auth-period">.</span></h2>
@@ -173,7 +173,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
 
           <div className="auth-no-account"><span>¿No tienes una cuenta?</span> Solicita acceso a la coordinación.</div>
           <div className="auth-panel-security"><LockKeyhole size={13} /><span>Conexión protegida</span><span className="auth-security-separator">·</span><span>Tu sesión es privada</span></div>
-          <div className="auth-copyright">© 2026 ROCAS · Gestión y análisis cualitativo STI</div>
+          <div className="auth-copyright">© 2026 SIMECT · Gestión y análisis cualitativo STI</div>
         </div>
         <div className="auth-mobile-backdrop" aria-hidden="true" />
       </section>

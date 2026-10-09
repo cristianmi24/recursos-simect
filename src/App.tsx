@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { CloudOff, LoaderCircle, RefreshCw } from 'lucide-react';
+import { CloudOff, RefreshCw } from 'lucide-react';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { AuthProvider, type AuthUser, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';
@@ -18,12 +18,13 @@ import { TriangulationView } from './components/TriangulationModule/Triangulatio
 import { ReportsView } from './components/ReportsModule/ReportsView';
 import { AuditExportView } from './components/AuditExportModule/AuditExportView';
 import { DeliverablesView } from './components/DeliverablesModule/DeliverablesView';
+import { LoadingScreen } from './components/LoadingScreen';
 
 const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
   const { appMode, activeTab, dataStatus, dataError, persistenceError, sessionsTruncated, retryData } = useProject();
 
   if (dataStatus === 'loading') {
-    return <main className="app-content flex-1 max-w-7xl w-full mx-auto px-4 py-8"><section className="connection-card connection-card--loading" aria-live="polite" aria-busy="true"><span className="connection-orbit" aria-hidden="true"><LoaderCircle /></span><div><h1>Preparando tu espacio de trabajo</h1><p>Estamos comprobando el acceso y cargando los datos disponibles.</p></div></section></main>;
+    return <LoadingScreen message="Cargando tus datos de SIMECT…" />;
   }
 
   if (dataStatus === 'error') {
@@ -65,7 +66,7 @@ const Workspace: React.FC<{ user: AuthUser }> = ({ user }) => {
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div>
-            <span className="font-bold text-slate-700">SISTEMA ROCAS — Metodología Cualitativa del STI</span>{' '}
+            <span className="font-bold text-slate-700">SIMECT — Metodología Cualitativa del STI</span>{' '}
             · Gestión, Codificación y Triangulación de Instrumentos Educativos
           </div>
           <div className="text-[11px] text-slate-500 font-medium">
@@ -81,13 +82,7 @@ const Application: React.FC = () => {
   const { user, status, configured } = useAuth();
 
   if (status === 'loading') {
-    return (
-      <main className="auth-loading" aria-live="polite" aria-busy="true">
-        <span className="auth-loading-mark">R</span>
-        <span className="auth-loading-orbit" aria-hidden="true"><LoaderCircle /></span>
-        <span>Comprobando el acceso seguro…</span>
-      </main>
-    );
+    return <LoadingScreen message="Comprobando el acceso seguro…" />;
   }
 
   if (!user) return <LoginPage configured={configured} offline={status === 'offline'} />;

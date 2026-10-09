@@ -172,7 +172,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(103, 202, 16
 }
 
 
-/* Sistema visual ROCAS: verde salvia, menta, lavanda y marfil. */
+/* Sistema visual SIMECT: verde salvia, menta, lavanda y marfil. */
 :root {
   --color-slate-50: #f5f7f2;
   --color-slate-100: #edf1eb;
@@ -517,4 +517,93 @@ a:focus-visible,
   .shortcuts-trigger,
   .connection-retry,
   .not-found-home { transition: none !important; }
+}
+
+
+.loading-screen {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #1b3024;
+  background: radial-gradient(ellipse at 50% 42%, #ffffff 0%, #f5f7f2 58%, #e8efe7 100%);
+}
+.loading-card {
+  width: min(100%, 420px);
+  padding: clamp(28px, 7vw, 48px);
+  border: 1px solid rgba(88, 125, 88, .16);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 24px 80px rgba(30, 58, 44, .09);
+  text-align: center;
+}
+.loading-brand-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  margin: 0 auto 24px;
+  border: 1px solid #c1ddc7;
+  border-radius: 17px;
+  color: #f8fff8;
+  background: linear-gradient(145deg, #456746, #203a2c);
+  box-shadow: 0 8px 20px rgba(32, 58, 44, .14);
+  font-family: Georgia, serif;
+  font-size: 30px;
+  font-weight: 700;
+  font-style: italic;
+}
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  margin: 0 auto 17px;
+  border: 2px solid #dcecdf;
+  border-top-color: #587d58;
+  border-radius: 50%;
+  animation: auth-spin .8s linear infinite;
+}
+.loading-brand-name {
+  margin: 0;
+  color: #365238;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .19em;
+}
+.loading-brand-name span {
+  color: #769b67;
+  font-weight: 600;
+}
+.loading-card h1 {
+  margin: 13px 0 22px;
+  color: #1b3024;
+  font-size: clamp(17px, 4vw, 20px);
+  font-weight: 650;
+  letter-spacing: -.02em;
+}
+.loading-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1eb;
+}
+.loading-progress span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #769b67, #b9d2a8);
+  animation: loading-progress-slide 1.6s ease-in-out infinite;
+}
+@keyframes loading-progress-slide {
+  from { transform: translateX(-115%); }
+  to { transform: translateX(285%); }
+}
+.loading-hint {
+  min-height: 1.5em;
+  margin: 14px 0 0;
+  color: #718176;
+  font-size: 12px;
+  line-height: 1.5;
 }

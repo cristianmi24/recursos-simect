@@ -1,0 +1,6 @@
+{
+  "name": "Sistema ROCAS - Gestión y Análisis Cualitativo STI",
+  "description": "Sistema metodológico interdisciplinario para la gestión, codificación cualitativa y triangulación de instrumentos de investigación (Observación, Grupo Focal, Entrevista) en Sistemas Tutores Inteligentes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

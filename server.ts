@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MAX_SESSION_BYTES, parseJsonObject, validateSessionDraft } from './server/researchData';
+import { MAX_SESSION_BYTES, parseJsonObject, validateSessionDraft } from './server/researchData.js';
 import type { AuditLogEntry, ManagedUser, ResearchSession } from './src/types';
 
 type Role = 'tutor' | 'admin';
@@ -725,7 +725,7 @@ app.patch('/api/admin/users/:id', writeLimiter, allowSameOrigin, async (req, res
   }
 });
 
-// En Vercel los archivos estáticos se sirven desde public/ y vercel.json reescribe las rutas de la SPA.
+// En Vercel la SPA se sirve como estática desde dist/ y solo /api/* llega a la función (api/index.ts).
 if (isProduction && !isVercel) {
   const distDirectory = join(here, 'dist');
   app.use(express.static(distDirectory, { index: false, maxAge: '1h' }));

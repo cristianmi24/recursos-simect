@@ -368,7 +368,7 @@ export const CodingWorkspaceView: React.FC = () => {
             <option value="ALL">Todas las categorías</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.code} — {c.name}
+                {c.code} · {c.name}
               </option>
             ))}
           </select>
@@ -588,7 +588,7 @@ export const CodingWorkspaceView: React.FC = () => {
                   >
                     {sessions.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.instrumentCode} ({s.instrumentType}) — {s.studentPseudonym || 'Grupo Focal'} ({s.date})
+                        {s.instrumentCode} ({s.instrumentType}) · {s.studentPseudonym || 'Grupo Focal'} ({s.date})
                       </option>
                     ))}
                   </select>

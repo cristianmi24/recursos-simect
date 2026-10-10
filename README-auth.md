@@ -5,7 +5,8 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 ## Qué hace esta implementación
 
 - La página inicial es un inicio de sesión para **Tutor** y **Administración**. No hay registro público ni cuentas o contraseñas de prueba para la autenticación real.
-- Cuando la autenticación real no está configurada o el servicio de sesión no responde, aparecen dos botones de **entrada rápida de revisión**, también en producción. Abren perfiles locales de tutor o administración, cargan datos de ejemplo para administración y mantienen cualquier cambio solo en memoria; no consultan ni escriben en Neon. Si el servidor confirma que la autenticación real sí está configurada, los botones no aparecen. Los cambios de revisión se pierden al recargar.
+- No existe modo demo ni datos de ejemplo: todo se lee y se guarda en Neon. Si `DATABASE_URL` no está configurada, el inicio de sesión queda deshabilitado.
+- Administración puede crear cuentas de **tutor** y activarlas o desactivarlas desde la pestaña **Usuarios**. Las cuentas de administración se crean solo con `npm run users:create`.
 - El servidor valida correo, contraseña y rol; usa bcrypt (factor 12), limita intentos, crea una sesión opaca de ocho horas y solo guarda el hash SHA-256 del token en Neon. La cookie es `HttpOnly`, `SameSite=Strict` y, en producción, `Secure`.
 - Un tutor puede crear formularios y consultar solo los que creó su cuenta. La administración puede consultar, editar y retirar formularios de cualquier tutor.
 - La administración, los fragmentos codificados y las matrices de triangulación se cargan desde Neon y solo se modifican mediante rutas que vuelven a comprobar el rol en el servidor. El estado administrativo usa control de versión para no pisar silenciosamente cambios concurrentes.
@@ -28,7 +29,7 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 
    El comando solicita el nombre, correo, rol (`tutor` o `admin`) y contraseña dos veces, sin mostrarla mientras se escribe. La contraseña requiere al menos 12 caracteres y admite como máximo 72 bytes por el algoritmo bcrypt. Crea por lo menos una cuenta `admin`; no existe una contraseña predeterminada.
 
-8. Para desarrollo con cuentas reales, coloca las variables correspondientes en un `.env` local excluido de Git. `npm run dev` inicia Vite en el puerto 3000 y la API Express en el 3001. Si no configuras Neon, puedes usar las entradas rápidas locales para revisar la interfaz. Para producción, `npm run build` genera el frontend y `npm start` sirve la aplicación y la API desde Express; las entradas rápidas solo se muestran si la autenticación real no está configurada o el servicio de sesión no responde.
+8. Para desarrollo con cuentas reales, coloca las variables correspondientes en un `.env` local excluido de Git. `npm run dev` inicia Vite en el puerto 3000 y la API Express en el 3001. Para producción, `npm run build` genera el frontend y `npm start` sirve la aplicación y la API desde Express.
 
 ## Protección y límites de los datos
 
@@ -36,7 +37,7 @@ Escribe únicamente **seudónimos** en los campos destinados a participantes; no
 
 La lista de formularios devuelve hasta 1.000 registros y la pantalla de auditoría muestra los 500 eventos más recientes. Si se alcanza alguno de esos límites, la interfaz lo indica; antes de superar esos volúmenes hay que añadir paginación. La exportación JSON contiene respuestas, seudónimos, categorías y eventos disponibles: trátala como información sensible y almacénala con acceso restringido.
 
-La importación y el restablecimiento afectan solo categorías, fragmentos y triangulaciones. Por diseño, no importan, reemplazan ni borran formularios ni eventos de auditoría. Los cambios administrativos se sincronizan automáticamente con control de versión; ante un conflicto, conserva/exporta el cambio local antes de recargar.
+La importación afecta solo categorías, fragmentos y triangulaciones. Por diseño, no importan, reemplazan ni borran formularios ni eventos de auditoría. Los cambios administrativos se sincronizan automáticamente con control de versión; ante un conflicto, conserva/exporta el cambio local antes de recargar.
 
 ## Comprobaciones
 

@@ -13,6 +13,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { useProject } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
 import type {
   FocusGroupRecord,
   FocusGroupTurn,
@@ -137,6 +138,7 @@ function sessionDraft(session: ResearchSession, questions: QuestionDefinition[])
 
 export const TutorDataEntryFlow: React.FC = () => {
   const { questions, sessions, addSession, updateSession } = useProject();
+  const isAdmin = useAuth().user?.role === 'admin';
   const [phase, setPhase] = useState<WizardPhase>('home');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>('OBS');
   const [stepIndex, setStepIndex] = useState(0);
@@ -336,7 +338,7 @@ export const TutorDataEntryFlow: React.FC = () => {
     ['Institución', draft.institution],
     ['Grado / grupo', draft.grade],
     ['Número de sesión STI', String(draft.sessionNumber)],
-    [selectedInstrument === 'GF' ? 'Seudónimos de participantes' : 'Seudónimo del estudiante', selectedInstrument === 'GF' ? (draft.participantPseudonyms?.join(', ') || '—') : (draft.studentPseudonym || '—')],
+    [selectedInstrument === 'GF' ? 'Seudónimos de participantes' : 'Seudónimo del estudiante', selectedInstrument === 'GF' ? (draft.participantPseudonyms?.join(', ') || 'Sin dato') : (draft.studentPseudonym || 'Sin dato')],
     ['Módulo o tarea del STI', draft.stiVersionOrTask],
     ...(selectedInstrument === 'GF' ? [['Duración', `${draft.sessionDurationMinutes || 45} minutos`]] : []),
     ['Consentimiento verificado', draft.recordingConsentApproved ? 'Sí' : 'No'],
@@ -459,13 +461,13 @@ export const TutorDataEntryFlow: React.FC = () => {
       const record = draft.observationRecords?.[question.id];
       answer = record?.observed === 'not_applicable'
         ? <p><strong>No observado:</strong> {record.notObservedReason || 'Sin motivo registrado'}</p>
-        : <><p><strong>Respuesta:</strong> {record?.scaleValue || '—'}</p><p className="mt-2"><strong>Evidencia:</strong> {record?.observableEvidence || '—'}</p>{record?.contextualNotes && <p className="mt-2"><strong>Notas:</strong> {record.contextualNotes}</p>}</>;
+        : <><p><strong>Respuesta:</strong> {record?.scaleValue || 'Sin dato'}</p><p className="mt-2"><strong>Evidencia:</strong> {record?.observableEvidence || 'Sin dato'}</p>{record?.contextualNotes && <p className="mt-2"><strong>Notas:</strong> {record.contextualNotes}</p>}</>;
     } else if (selectedInstrument === 'GF') {
       const record = draft.focusGroupRecords?.[question.id];
       answer = <><ul className="space-y-3">{record?.turns.map((turn, index) => <li key={turn.id} className="rounded-lg bg-white p-3"><strong>Intervención {index + 1} · {turn.participantPseudonym || 'Sin seudónimo'}</strong><p className="mt-1 whitespace-pre-wrap">{turn.text || 'Sin transcripción'}</p>{turn.contextualNotes && <p className="mt-1"><strong>Contexto:</strong> {turn.contextualNotes}</p>}</li>)}</ul>{record?.moderatorNotes && <p className="mt-2"><strong>Notas del moderador:</strong> {record.moderatorNotes}</p>}</>;
     } else {
       const record = draft.interviewRecords?.[question.id];
-      answer = <><p className="whitespace-pre-wrap">{record?.verbatimResponse || '—'}</p>{record?.probingQuestions && <p className="mt-2"><strong>Repreguntas:</strong> {record.probingQuestions}</p>}{record?.contextualNotes && <p className="mt-2"><strong>Contexto:</strong> {record.contextualNotes}</p>}</>;
+      answer = <><p className="whitespace-pre-wrap">{record?.verbatimResponse || 'Sin dato'}</p>{record?.probingQuestions && <p className="mt-2"><strong>Repreguntas:</strong> {record.probingQuestions}</p>}{record?.contextualNotes && <p className="mt-2"><strong>Contexto:</strong> {record.contextualNotes}</p>}</>;
     }
     return (
       <section key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -482,10 +484,10 @@ export const TutorDataEntryFlow: React.FC = () => {
     return (
       <div className="tutor-home mx-auto max-w-7xl">
         <header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900"><ShieldCheck size={15} aria-hidden="true" />Espacio de formularios del tutor</div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900"><ShieldCheck size={15} aria-hidden="true" />{isAdmin ? 'Formularios · Administración' : 'Espacio de formularios del tutor'}</div>
           <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">¿Qué formulario vas a completar?</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Elige un instrumento para comenzar. Te guiaremos por los datos de la sesión, cada pregunta y una revisión completa antes de enviar.</p>
-          <p className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-slate-600"><LockKeyhole size={14} aria-hidden="true" />Verás tus propios registros; Administración puede revisar los formularios de todos los tutores.</p>
+          <p className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-slate-600"><LockKeyhole size={14} aria-hidden="true" />{isAdmin ? 'Como Administración ves y puedes editar los formularios de todos los tutores.' : 'Verás tus propios registros; Administración puede revisar los formularios de todos los tutores.'}</p>
           {successMessage && <div className="mt-5 flex items-start gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950" role="status" aria-live="polite"><CheckCircle2 className="mt-0.5 shrink-0" size={19} aria-hidden="true" /><p className="font-semibold">{successMessage}</p><button type="button" onClick={() => setSuccessMessage('')} className="ml-auto min-h-11 px-3 font-bold underline">Cerrar</button></div>}
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="Selecciona uno de los tres formularios">
             {instrumentCards.map((instrument) => {
@@ -510,7 +512,7 @@ export const TutorDataEntryFlow: React.FC = () => {
 
         <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="tutor-history-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div><div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><ClipboardList size={15} aria-hidden="true" />Historial personal</div><h2 id="tutor-history-title" className="mt-1 text-xl font-extrabold text-slate-900">Formularios enviados</h2><p className="mt-1 text-sm text-slate-600">Puedes consultar y editar tus registros; los cambios quedarán registrados con la fecha de actualización.</p></div>
+            <div><div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><ClipboardList size={15} aria-hidden="true" />{isAdmin ? 'Historial general' : 'Historial personal'}</div><h2 id="tutor-history-title" className="mt-1 text-xl font-extrabold text-slate-900">Formularios enviados</h2><p className="mt-1 text-sm text-slate-600">Puedes consultar y editar tus registros; los cambios quedarán registrados con la fecha de actualización.</p></div>
             <label className="flex min-h-12 items-center gap-2 text-sm font-semibold text-slate-700">Filtrar
               <select value={filterType} onChange={(event) => { setFilterType(event.target.value as InstrumentType | 'ALL'); setShowAllSessions(false); }} className="min-h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900">
                 <option value="ALL">Todos</option><option value="OBS">OBS</option><option value="GF">GF</option><option value="E">E</option>
@@ -600,7 +602,7 @@ export const TutorDataEntryFlow: React.FC = () => {
           <div><h2 className="text-xl font-extrabold text-slate-900">Revisa antes de enviar</h2><p className="mt-1 text-sm leading-6 text-slate-600">Comprueba los datos y las respuestas. Usa cada botón «Editar» para volver directamente al paso correspondiente.</p></div>
           <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
             <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Datos generales</h3><p className="mt-1 text-xs text-slate-500">{instrumentInfo.title}</p></div><button type="button" onClick={() => setStepIndex(0)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><Pencil size={15} aria-hidden="true" />Editar</button></div>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">{metadataSummary.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-0.5 break-words text-sm text-slate-900">{value || '—'}</dd></div>)}</dl>
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">{metadataSummary.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-0.5 break-words text-sm text-slate-900">{value || 'Sin dato'}</dd></div>)}</dl>
           </section>
           {relevantQuestions.map(renderQuestionReview)}
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"><strong>Una última comprobación:</strong> no incluyas datos identificables de estudiantes. Al confirmar, el registro quedará asociado a tu cuenta y Administración podrá revisarlo.</div>

@@ -4,7 +4,6 @@ import {
   ShieldCheck,
   Download,
   Upload,
-  RefreshCw,
   Search,
   Eye,
   EyeOff,
@@ -24,7 +23,6 @@ export const AuditExportView: React.FC = () => {
     setIsPseudonymized,
     exportProjectJson,
     importProjectJson,
-    resetToSampleData,
     currentResearcher,
     codedFragments
   } = useProject();
@@ -211,17 +209,6 @@ export const AuditExportView: React.FC = () => {
                 />
               </label>
 
-              <button
-                onClick={() => {
-                  if (confirm('¿Reiniciar las matrices analíticas a la estructura de muestra? Las sesiones y la bitácora de auditoría se conservarán.')) {
-                    resetToSampleData();
-                  }
-                }}
-                className="p-2 rounded-lg bg-white border border-slate-300 hover:bg-rose-50 text-slate-500 hover:text-rose-600 transition-colors shadow-2xs"
-                title="Reiniciar a datos de muestra"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
             </div>
           </div>
         </div>

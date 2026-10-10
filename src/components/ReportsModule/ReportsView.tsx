@@ -12,6 +12,7 @@ import {
   Copy,
   Info
 } from 'lucide-react';
+import { markdownToPlainText } from '../../utils/plainText';
 
 export const ReportsView: React.FC = () => {
   const {
@@ -182,7 +183,7 @@ Los datos evidencian que el STI promueve una mediación activa cuando las pistas
 ## 5. Conclusiones
 Verificadas empíricamente mediante triangulación de fuentes.`;
 
-    navigator.clipboard.writeText(md);
+    navigator.clipboard.writeText(markdownToPlainText(md));
     setCopiedNotification(true);
     setTimeout(() => setCopiedNotification(false), 2500);
   };

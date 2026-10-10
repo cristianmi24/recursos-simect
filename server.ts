@@ -8,7 +8,7 @@ import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MAX_SESSION_BYTES, parseJsonObject, validateSessionDraft } from './server/researchData';
-import type { AuditLogEntry, ResearchSession } from './src/types';
+import type { AuditLogEntry, ManagedUser, ResearchSession } from './src/types';
 
 type Role = 'tutor' | 'admin';
 type AuthUser = { id: string; name: string; email: string; role: Role };
@@ -27,6 +27,12 @@ const isProduction = process.env.NODE_ENV === 'production';
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const sql = databaseUrl ? neon(databaseUrl) : null;
 const configuredOrigin = process.env.APP_ORIGIN?.trim().replace(/\/$/, '');
+// En Vercel, los dominios del despliegue se aceptan automáticamente; APP_ORIGIN solo hace falta para un dominio propio.
+const vercelOrigins = [process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL]
+  .map((host) => host?.trim())
+  .filter((host): host is string => Boolean(host))
+  .map((host) => `https://${host}`);
+const trustedOrigins = new Set([configuredOrigin, ...vercelOrigins].filter((origin): origin is string => Boolean(origin)));
 const sessionHours = 8;
 const sessionMaxAgeSeconds = sessionHours * 60 * 60;
 const cookieName = isProduction ? '__Host-rocas_session' : 'rocas_session';
@@ -36,7 +42,7 @@ const sessionListLimit = 1000;
 const auditListLimit = 500;
 
 if (isProduction && !databaseUrl) throw new Error('DATABASE_URL es obligatorio en producción.');
-if (isProduction && !configuredOrigin) throw new Error('APP_ORIGIN es obligatorio en producción.');
+if (isProduction && trustedOrigins.size === 0) throw new Error('APP_ORIGIN es obligatorio en producción fuera de Vercel.');
 if (process.env.TRUST_PROXY) {
   const hops = Number(process.env.TRUST_PROXY);
   if (!Number.isInteger(hops) || hops < 1) throw new Error('TRUST_PROXY debe ser un número entero positivo o quedar sin configurar.');
@@ -44,7 +50,10 @@ if (process.env.TRUST_PROXY) {
 
 const app = express();
 app.disable('x-powered-by');
+// En Vercel hay un proxy delante: sin esto, el límite de intentos trataría a todos los usuarios como una sola IP.
+const isVercel = Boolean(process.env.VERCEL);
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
+else if (isVercel) app.set('trust proxy', 1);
 app.use(helmet());
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -96,8 +105,7 @@ function clearSessionCookie(res: Response): void {
 
 function allowSameOrigin(req: Request, res: Response, next: NextFunction): void {
   const origin = req.get('origin');
-  const allowedOrigins = new Set<string>();
-  if (configuredOrigin) allowedOrigins.add(configuredOrigin);
+  const allowedOrigins = new Set(trustedOrigins);
   if (!isProduction) {
     allowedOrigins.add('http://localhost:3000');
     allowedOrigins.add('http://127.0.0.1:3000');
@@ -614,7 +622,111 @@ app.post('/api/admin/audit', writeLimiter, allowSameOrigin, async (req, res) => 
   }
 });
 
-if (isProduction) {
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function managedUserFromRow(row: Record<string, unknown>): ManagedUser {
+  return {
+    id: String(row.id),
+    name: String(row.display_name),
+    email: String(row.email),
+    role: row.role === 'admin' ? 'admin' : 'tutor',
+    isActive: Boolean(row.is_active),
+    createdAt: isoTimestamp(row.created_at)
+  };
+}
+
+app.get('/api/admin/users', async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  if (!requireAdmin(user, res)) return;
+  try {
+    const rows = await sql`
+      SELECT id, display_name, email, role, is_active, created_at
+      FROM auth_users ORDER BY role, display_name
+    `;
+    res.json({ users: rows.map((row) => managedUserFromRow(row as Record<string, unknown>)) });
+  } catch (error) {
+    responseError(res, error, 'No se pudo cargar la lista de usuarios.');
+  }
+});
+
+// Administración solo crea cuentas de tutor; las cuentas admin se aprovisionan con `npm run users:create`.
+app.post('/api/admin/users', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  if (!requireAdmin(user, res)) return;
+  const input = isPlainRecord(req.body) ? req.body : null;
+  const name = typeof input?.name === 'string' ? input.name.trim() : '';
+  const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
+  const password = typeof input?.password === 'string' ? input.password : '';
+  if (name.length < 1 || name.length > 120) {
+    res.status(400).json({ error: 'El nombre debe tener entre 1 y 120 caracteres.' });
+    return;
+  }
+  if (!emailPattern.test(email) || email.length > 254) {
+    res.status(400).json({ error: 'Escribe un correo válido.' });
+    return;
+  }
+  if ([...password].length < 12 || Buffer.byteLength(password, 'utf8') > 72) {
+    res.status(400).json({ error: 'La contraseña debe tener al menos 12 caracteres (máximo 72 bytes).' });
+    return;
+  }
+  try {
+    const existing = await sql`SELECT id FROM auth_users WHERE email = ${email} LIMIT 1`;
+    if (existing.length > 0) {
+      res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const rows = await sql`
+      INSERT INTO auth_users (display_name, email, password_hash, role)
+      VALUES (${name}, ${email}, ${passwordHash}, 'tutor')
+      RETURNING id, display_name, email, role, is_active, created_at
+    `;
+    const created = managedUserFromRow(rows[0] as Record<string, unknown>);
+    const auditEvent = await writeAuditEvent(user, {
+      action: 'create_user', entityType: 'user', entityId: created.id, summary: `Cuenta de tutor creada: ${created.email}`
+    }).catch(() => null);
+    res.status(201).json({ user: created, auditEvent });
+  } catch (error) {
+    responseError(res, error, 'No se pudo crear la cuenta.');
+  }
+});
+
+app.patch('/api/admin/users/:id', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  if (!requireAdmin(user, res)) return;
+  const input = isPlainRecord(req.body) ? req.body : null;
+  if (typeof input?.isActive !== 'boolean') {
+    res.status(400).json({ error: 'Indica si la cuenta queda activa o inactiva.' });
+    return;
+  }
+  const isActive = input.isActive;
+  try {
+    const rows = await sql`
+      UPDATE auth_users SET is_active = ${isActive}, updated_at = NOW()
+      WHERE id::text = ${req.params.id} AND role = 'tutor'
+      RETURNING id, display_name, email, role, is_active, created_at
+    `;
+    if (!rows[0]) {
+      res.status(404).json({ error: 'No se encontró la cuenta de tutor.' });
+      return;
+    }
+    const updated = managedUserFromRow(rows[0] as Record<string, unknown>);
+    if (!isActive) await sql`UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = ${updated.id} AND revoked_at IS NULL`;
+    const auditEvent = await writeAuditEvent(user, {
+      action: 'update_user', entityType: 'user', entityId: updated.id,
+      summary: `Cuenta de tutor ${isActive ? 'activada' : 'desactivada'}: ${updated.email}`
+    }).catch(() => null);
+    res.json({ user: updated, auditEvent });
+  } catch (error) {
+    responseError(res, error, 'No se pudo actualizar la cuenta.');
+  }
+});
+
+// En Vercel los archivos estáticos se sirven desde public/ y vercel.json reescribe las rutas de la SPA.
+if (isProduction && !isVercel) {
   const distDirectory = join(here, 'dist');
   app.use(express.static(distDirectory, { index: false, maxAge: '1h' }));
   app.get('*', (req, res, next) => {
@@ -637,6 +749,10 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 const defaultPort = isProduction ? 3000 : 3001;
 const port = Number(process.env.PORT ?? defaultPort);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT debe ser un puerto válido.');
-app.listen(port, '0.0.0.0', () => {
-  console.log(`API SIMECT lista en el puerto ${port}${sql ? '' : ' (Neon sin configurar)'}.`);
-});
+if (!isVercel) {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`API SIMECT lista en el puerto ${port}${sql ? '' : ' (Neon sin configurar)'}.`);
+  });
+}
+
+export default app;

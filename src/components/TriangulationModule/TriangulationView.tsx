@@ -237,7 +237,7 @@ export const TriangulationView: React.FC = () => {
             <option value="ALL">Todas las categorías trianguladas</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.code} — {c.name}
+                {c.code} · {c.name}
               </option>
             ))}
           </select>
@@ -480,7 +480,7 @@ export const TriangulationView: React.FC = () => {
                       .filter((c) => !c.isTransversal)
                       .map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.code} — {c.name}
+                          {c.code} · {c.name}
                         </option>
                       ))}
                   </select>
@@ -500,7 +500,7 @@ export const TriangulationView: React.FC = () => {
                       .filter((c) => c.isTransversal)
                       .map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.code} — {c.name}
+                          {c.code} · {c.name}
                         </option>
                       ))}
                   </select>

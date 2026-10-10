@@ -53,7 +53,9 @@ GRANT USAGE ON SCHEMA public TO rocas_runtime_app, rocas_provisioner_app;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM rocas_runtime_app, rocas_provisioner_app;
 
 -- Proceso web: autenticación, formularios, estado administrativo y bitácora.
-GRANT SELECT ON auth_users TO rocas_runtime_app;
+-- Administración crea cuentas de tutor y las activa/desactiva desde la web.
+GRANT SELECT, INSERT ON auth_users TO rocas_runtime_app;
+GRANT UPDATE (is_active, updated_at) ON auth_users TO rocas_runtime_app;
 GRANT SELECT, INSERT, UPDATE ON auth_sessions TO rocas_runtime_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON research_sessions TO rocas_runtime_app;
 GRANT SELECT, INSERT, UPDATE ON rocas_project_state TO rocas_runtime_app;

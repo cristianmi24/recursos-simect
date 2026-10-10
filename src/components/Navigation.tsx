@@ -2,25 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject, type ActiveTab } from '../context/ProjectContext';
 import {
-  BookOpen,
-  ClipboardList,
-  FileText,
-  FolderTree,
-  GitCompare,
   LayoutDashboard,
   LogOut,
+  Menu,
   Send,
-  ShieldCheck,
-  Tag,
-  UserRound,
-  Eye,
-  EyeOff,
   ChevronRight,
   CircleHelp,
   X
 } from 'lucide-react';
 
-const SHORTCUT_TABS: ActiveTab[] = ['deliverables', 'categories', 'coding', 'triangulation', 'reports', 'intake', 'audit'];
+const SHORTCUT_TABS: ActiveTab[] = ['deliverables', 'categories', 'coding', 'triangulation', 'reports', 'intake', 'audit', 'users'];
 const BREADCRUMB_LABELS: Record<ActiveTab, string> = {
   deliverables: 'Entregables',
   categories: 'Categorías',
@@ -28,7 +19,8 @@ const BREADCRUMB_LABELS: Record<ActiveTab, string> = {
   triangulation: 'Triangulación',
   reports: 'Reportes',
   intake: 'Sesiones',
-  audit: 'Trazabilidad y exportación'
+  audit: 'Trazabilidad y exportación',
+  users: 'Usuarios'
 };
 
 export const WorkspaceBreadcrumbs: React.FC = () => {
@@ -53,19 +45,13 @@ export const WorkspaceBreadcrumbs: React.FC = () => {
   );
 };
 
-export const Navigation: React.FC = () => {
+export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: boolean }> = ({ onOpenSidebar, sidebarOpen = false }) => {
   const { user, logout } = useAuth();
   const {
     activeTab,
     setActiveTab,
     appMode,
     setAppMode,
-    sessions,
-    codedFragments,
-    categories,
-    triangulationEntries,
-    isPseudonymized,
-    setIsPseudonymized
   } = useProject();
   const [logoutError, setLogoutError] = useState('');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -73,6 +59,18 @@ export const Navigation: React.FC = () => {
   const shortcutPrefixRef = useRef(false);
   const prefixTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const userRole = user?.role ?? 'tutor';
+  const headerRef = useRef<HTMLElement>(null);
+
+  // La altura de la cabecera fija dónde se ancla el menú lateral.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const update = () => document.documentElement.style.setProperty('--app-header-h', `${header.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -144,16 +142,7 @@ export const Navigation: React.FC = () => {
 
   if (!user) return null;
 
-  const pendingProposalsCount = codedFragments.filter((fragment) => fragment.status === 'propuesta_pendiente').length;
-  const adminTabs: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: number | string }[] = [
-    { id: 'deliverables', label: 'Dossier de Entregables (1 al 8)', icon: <BookOpen className="w-4 h-4 text-indigo-600" />, badge: '8 Docs' },
-    { id: 'categories', label: 'Matriz de Categorías', icon: <FolderTree className="w-4 h-4 text-emerald-600" />, badge: categories.length },
-    { id: 'coding', label: 'Codificación Cualitativa', icon: <Tag className="w-4 h-4 text-blue-600" />, badge: pendingProposalsCount > 0 ? `${pendingProposalsCount} pend.` : codedFragments.length },
-    { id: 'triangulation', label: 'Matriz de Triangulación', icon: <GitCompare className="w-4 h-4 text-purple-600" />, badge: triangulationEntries.length },
-    { id: 'reports', label: 'Reportes Analíticos', icon: <FileText className="w-4 h-4 text-amber-600" />, badge: '8 Rep.' },
-    { id: 'intake', label: 'Catálogo de Sesiones', icon: <ClipboardList className="w-4 h-4 text-slate-600" />, badge: sessions.length },
-    { id: 'audit', label: 'Trazabilidad y Exportación', icon: <ShieldCheck className="w-4 h-4 text-slate-600" /> }
-  ];
+  const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'U';
 
   const handleLogout = async () => {
     setLogoutError('');
@@ -162,9 +151,14 @@ export const Navigation: React.FC = () => {
   };
 
   return (
-    <header className={`app-navigation ${user.role === 'tutor' ? 'app-navigation--tutor' : ''} bg-white border-b border-slate-200 text-slate-900 sticky top-0 z-40 shadow-xs`}>
-      <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
+    <header ref={headerRef} className={`app-navigation ${user.role === 'tutor' ? 'app-navigation--tutor' : ''} bg-white border-b border-slate-200 text-slate-900 sticky top-0 z-40 shadow-xs`}>
+      <div className="w-full px-4 lg:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="flex items-center gap-3">
+          {onOpenSidebar && (
+            <button type="button" className="side-hamburger" onClick={onOpenSidebar} aria-label="Abrir menú de administración" aria-expanded={sidebarOpen} aria-controls="admin-sidebar">
+              <Menu aria-hidden="true" />
+            </button>
+          )}
           <div className="workspace-brand-mark w-10 h-10 rounded-xl bg-emerald-900 text-white flex items-center justify-center font-black tracking-tight text-sm shadow-xs">S</div>
           <div>
             <div className="flex items-center gap-2">
@@ -177,12 +171,12 @@ export const Navigation: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           {user.role === 'admin' ? (
-            <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200" aria-label="Modo de administración">
+            <div className="mode-switch" aria-label="Modo de administración">
               <button
                 type="button"
                 aria-pressed={appMode === 'responder'}
                 onClick={() => { setAppMode('responder'); setActiveTab('intake'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${appMode === 'responder' ? 'bg-white text-emerald-800 shadow-xs ring-1 ring-slate-200/80' : 'text-slate-600 hover:text-slate-900'}`}
+                className="mode-switch-option mode-switch-option--forms"
               >
                 <Send className="w-3.5 h-3.5" /><span>Formularios</span>
               </button>
@@ -190,7 +184,7 @@ export const Navigation: React.FC = () => {
                 type="button"
                 aria-pressed={appMode === 'admin'}
                 onClick={() => { setAppMode('admin'); if (activeTab === 'intake') setActiveTab('deliverables'); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${appMode === 'admin' ? 'bg-emerald-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                className="mode-switch-option mode-switch-option--admin"
               >
                 <LayoutDashboard className="w-3.5 h-3.5" /><span>Administración</span>
               </button>
@@ -200,15 +194,6 @@ export const Navigation: React.FC = () => {
               <Send className="w-3.5 h-3.5" /> Módulo tutor
             </span>
           )}
-
-          <button
-            onClick={() => setIsPseudonymized(!isPseudonymized)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${isPseudonymized ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-amber-50 border-amber-300 text-amber-800'}`}
-            title={isPseudonymized ? 'Ocultar seudónimos en la exportación CSV' : 'Mostrar seudónimos en la exportación CSV'}
-            aria-pressed={isPseudonymized}
-          >
-            {isPseudonymized ? <><Eye className="w-3.5 h-3.5" /><span className="hidden md:inline">Seudónimos: <strong>VISIBLES</strong></span></> : <><EyeOff className="w-3.5 h-3.5" /><span className="hidden md:inline">Seudónimos: <strong>OCULTOS</strong></span></>}
-          </button>
 
           <button
             type="button"
@@ -224,10 +209,10 @@ export const Navigation: React.FC = () => {
             <kbd aria-hidden="true">?</kbd>
           </button>
 
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-slate-700" title={user.email}>
-            <UserRound className="w-3.5 h-3.5 shrink-0 text-emerald-800" />
-            <span className="max-w-[170px] truncate text-xs font-semibold">{user.name}</span>
-            <span className="hidden lg:inline rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-600">{user.role === 'admin' ? 'Admin' : 'Tutor'}</span>
+          <div className={`user-chip ${user.role === 'admin' ? 'user-chip--admin' : ''}`} title={user.email}>
+            <span className="user-chip-avatar" aria-hidden="true">{initials}</span>
+            <span className="user-chip-name">{user.name}</span>
+            <span className="user-chip-role">{user.role === 'admin' ? 'Admin' : 'Tutor'}</span>
           </div>
           <button onClick={() => void handleLogout()} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700" title="Cerrar sesión">
             <LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Salir</span>
@@ -236,28 +221,6 @@ export const Navigation: React.FC = () => {
       </div>
 
       {logoutError && <div role="alert" className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-center text-xs text-rose-800">{logoutError}</div>}
-
-      {user.role === 'admin' && appMode === 'admin' && (
-        <div className="max-w-7xl mx-auto px-4 overflow-x-auto bg-slate-50/70 border-t border-slate-100">
-          <nav className="flex space-x-1 py-1.5" aria-label="Pestañas de administración">
-            {adminTabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg whitespace-nowrap transition-all ${isActive ? 'bg-white text-emerald-800 shadow-xs border border-slate-200 ring-1 ring-slate-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
-                >
-                  {tab.icon}<span>{tab.label}</span>
-                  {tab.badge !== undefined && <span className={`ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-900' : tab.id === 'coding' && pendingProposalsCount > 0 ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-200 text-slate-700'}`}>{tab.badge}</span>}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      )}
 
       <section id="workspace-shortcuts" className="shortcuts-popover" aria-label="Atajos de teclado" hidden={!shortcutsOpen}>
           <div className="shortcuts-popover-heading">

@@ -155,10 +155,19 @@ export interface TriangulationMatrixEntry {
 export interface AuditLogEntry {
   id: string;
   timestamp: string;
-  action: 'create_session' | 'update_session' | 'delete_session' | 'create_category' | 'update_category' | 'create_code' | 'review_code' | 'triangulate' | 'export_data' | 'system_reset';
-  entityType: 'session' | 'category' | 'coded_fragment' | 'triangulation' | 'system';
+  action: 'create_session' | 'update_session' | 'delete_session' | 'create_category' | 'update_category' | 'create_code' | 'review_code' | 'triangulate' | 'export_data' | 'system_reset' | 'create_user' | 'update_user';
+  entityType: 'session' | 'category' | 'coded_fragment' | 'triangulation' | 'system' | 'user';
   entityId: string;
   researcher: string;
   summary: string;
   details?: Record<string, unknown>;
+}
+
+export interface ManagedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'tutor' | 'admin';
+  isActive: boolean;
+  createdAt: string;
 }

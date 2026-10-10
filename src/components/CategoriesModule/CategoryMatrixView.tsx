@@ -50,27 +50,27 @@ export const CategoryMatrixView: React.FC = () => {
     { key: 'ALL', label: 'Todas las Familias', count: categories.length },
     {
       key: 'EXP',
-      label: 'EXP — Experiencias (9)',
+      label: 'EXP · Experiencias (9)',
       count: categories.filter((c) => c.family === 'EXP').length
     },
     {
       key: 'PER',
-      label: 'PER — Percepciones (7)',
+      label: 'PER · Percepciones (7)',
       count: categories.filter((c) => c.family === 'PER').length
     },
     {
       key: 'DIF',
-      label: 'DIF — Dificultades (6)',
+      label: 'DIF · Dificultades (6)',
       count: categories.filter((c) => c.family === 'DIF').length
     },
     {
       key: 'PC',
-      label: 'PC — Pensamiento Crítico (4)',
+      label: 'PC · Pensamiento Crítico (4)',
       count: categories.filter((c) => c.family === 'PC').length
     },
     {
       key: 'META',
-      label: 'META — Metacognición (3)',
+      label: 'META · Metacognición (3)',
       count: categories.filter((c) => c.family === 'META').length
     }
   ];
@@ -445,11 +445,11 @@ export const CategoryMatrixView: React.FC = () => {
                     onChange={(e) => setFormFamily(e.target.value as CategoryFamily)}
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none"
                   >
-                    <option value="EXP">EXP — Experiencias de Interacción</option>
-                    <option value="PER">PER — Percepciones del Estudiante</option>
-                    <option value="DIF">DIF — Dificultades Observadas/Reportadas</option>
-                    <option value="PC">PC — Dimensión: Pensamiento Crítico</option>
-                    <option value="META">META — Dimensión: Metacognición</option>
+                    <option value="EXP">EXP · Experiencias de Interacción</option>
+                    <option value="PER">PER · Percepciones del Estudiante</option>
+                    <option value="DIF">DIF · Dificultades Observadas/Reportadas</option>
+                    <option value="PC">PC · Dimensión: Pensamiento Crítico</option>
+                    <option value="META">META · Dimensión: Metacognición</option>
                   </select>
                 </div>
 

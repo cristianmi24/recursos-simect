@@ -1,4 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build && cp -R dist/. public/"
+  "framework": "express",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm run build && cp -R dist/. public/",
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

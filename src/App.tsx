@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { CloudOff, RefreshCw } from 'lucide-react';
 import { ProjectProvider, useProject } from './context/ProjectContext';
 import { AuthProvider, type AuthUser, useAuth } from './context/AuthContext';
 import { LoginPage } from './components/LoginPage';
 import { Navigation, WorkspaceBreadcrumbs } from './components/Navigation';
+import { AdminSidebar } from './components/AdminSidebar';
 import { NotFoundPage } from './components/NotFoundPage';
-import { DataEntryView } from './components/DataEntryModule/DataEntryView';
 import { InstrumentList } from './components/InstrumentsModule/InstrumentList';
 import { CategoryMatrixView } from './components/CategoriesModule/CategoryMatrixView';
 import { CodingWorkspaceView } from './components/CodingWorkspace/CodingWorkspaceView';
@@ -19,6 +19,7 @@ import { ReportsView } from './components/ReportsModule/ReportsView';
 import { AuditExportView } from './components/AuditExportModule/AuditExportView';
 import { DeliverablesView } from './components/DeliverablesModule/DeliverablesView';
 import { TutorDataEntryFlow } from './components/DataEntryModule/TutorDataEntryFlow';
+import { UsersView } from './components/UsersModule/UsersView';
 import { LoadingScreen } from './components/LoadingScreen';
 
 const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
@@ -35,19 +36,11 @@ const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
   const syncNotice = persistenceError && <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert"><strong>No se pudieron confirmar los cambios:</strong> {persistenceError} No recargues antes de exportar cualquier cambio aún no sincronizado.</div>;
   const limitNotice = sessionsTruncated && <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">La vista muestra hasta 1.000 sesiones; hay más formularios disponibles. Los informes y exportaciones todavía no incluyen esos registros adicionales.</div>;
 
-  // Los tutores usan el asistente paso a paso; Administración conserva su vista de captura.
-  if (role === 'tutor') {
+  // Tutores y Administración (modo Formularios) usan el mismo asistente paso a paso.
+  if (role === 'tutor' || appMode === 'responder') {
     return (
       <main className="app-content flex-1 max-w-7xl w-full mx-auto px-4 py-8">
         {syncNotice}{limitNotice}<TutorDataEntryFlow />
-      </main>
-    );
-  }
-
-  if (appMode === 'responder') {
-    return (
-      <main className="app-content flex-1 max-w-7xl w-full mx-auto px-4 py-8">
-        {syncNotice}{limitNotice}<DataEntryView />
       </main>
     );
   }
@@ -62,21 +55,38 @@ const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
       {activeTab === 'reports' && <ReportsView />}
       {activeTab === 'intake' && <InstrumentList />}
       {activeTab === 'audit' && <AuditExportView />}
+      {activeTab === 'users' && <UsersView />}
     </main>
   );
 };
 
 const Workspace: React.FC<{ user: AuthUser }> = ({ user }) => {
+  const { appMode } = useProject();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const showSidebar = user.role === 'admin' && appMode === 'admin';
+
   return (
     <div className="workspace-shell min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-600 selection:text-white">
-      <Navigation />
-      {user.demo && <div className="demo-mode-banner" role="status"><strong>Modo de revisión local</strong><span>Los cambios son temporales, se mantienen solo en esta sesión y no se envían a Neon.</span></div>}
-      <WorkspaceBreadcrumbs />
-      <MainContent role={user.role} />
+      <Navigation onOpenSidebar={showSidebar ? () => setSidebarOpen(true) : undefined} sidebarOpen={sidebarOpen} />
+      {showSidebar ? (
+        <div className="admin-layout">
+          <AdminSidebar mobileOpen={sidebarOpen} onCloseMobile={closeSidebar} />
+          <div className="admin-layout-main">
+            <WorkspaceBreadcrumbs />
+            <MainContent role={user.role} />
+          </div>
+        </div>
+      ) : (
+        <>
+          <WorkspaceBreadcrumbs />
+          <MainContent role={user.role} />
+        </>
+      )}
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div>
-            <span className="font-bold text-slate-700">SIMECT — Metodología Cualitativa del STI</span>{' '}
+            <span className="font-bold text-slate-700">SIMECT · Metodología Cualitativa del STI</span>{' '}
             · Gestión, Codificación y Triangulación de Instrumentos Educativos
           </div>
           <div className="text-[11px] text-slate-500 font-medium">

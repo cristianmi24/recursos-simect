@@ -56,8 +56,8 @@ function askHidden(prompt: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const databaseUrl = process.env.DATABASE_PROVISION_URL?.trim();
-  if (!databaseUrl) throw new Error('Falta DATABASE_PROVISION_URL para el rol de provisión de Neon.');
+  const databaseUrl = process.env.DATABASE_PROVISION_URL?.trim() || process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) throw new Error('Falta DATABASE_PROVISION_URL (o DATABASE_URL) para conectarse a Neon.');
 
   const prompts = createInterface({ input: stdin, output: stdout });
   const displayName = (await prompts.question('Nombre para mostrar: ')).trim();

@@ -11,6 +11,17 @@ import {
   HelpCircle,
   FileText
 } from 'lucide-react';
+import { markdownToPlainText } from '../../utils/plainText';
+
+// Convierte **negrita**, *cursiva* y `código` en elementos, sin dejar los símbolos a la vista.
+function renderInline(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={index} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>;
+    if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="rounded bg-slate-100 px-1 py-0.5 text-[0.92em] text-indigo-800">{part.slice(1, -1)}</code>;
+    if (part.length > 2 && part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
+    return part;
+  });
+}
 
 export const DeliverablesView: React.FC = () => {
   const [selectedSectionId, setSelectedSectionId] = useState<string>(
@@ -32,7 +43,7 @@ export const DeliverablesView: React.FC = () => {
 
   const handleCopy = () => {
     navigator.clipboard.writeText(
-      `# ${selectedDeliverable.title}\n## ${selectedDeliverable.subtitle}\n\n${selectedDeliverable.contentMarkdown}`
+      markdownToPlainText(`${selectedDeliverable.title}\n${selectedDeliverable.subtitle}\n\n${selectedDeliverable.contentMarkdown}`)
     );
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -57,7 +68,7 @@ export const DeliverablesView: React.FC = () => {
                 <tr>
                   {header.map((col, idx) => (
                     <th key={idx} className="px-3 py-2.5 text-left font-bold text-slate-900">
-                      {col.trim()}
+                      {renderInline(col.trim())}
                     </th>
                   ))}
                 </tr>
@@ -67,13 +78,7 @@ export const DeliverablesView: React.FC = () => {
                   <tr key={rIdx} className="hover:bg-slate-50/80 transition-colors">
                     {row.map((cell, cIdx) => (
                       <td key={cIdx} className="px-3 py-2.5 leading-relaxed">
-                        {cell.trim().startsWith('**') && cell.trim().endsWith('**') ? (
-                          <strong className="text-slate-900 font-bold">{cell.trim().replace(/\*\*/g, '')}</strong>
-                        ) : cell.trim().startsWith('*[Ficticio]*') ? (
-                          <span className="italic text-amber-800 font-medium">{cell.trim()}</span>
-                        ) : (
-                          cell.trim()
-                        )}
+                        {renderInline(cell.trim())}
                       </td>
                     ))}
                   </tr>
@@ -109,19 +114,19 @@ export const DeliverablesView: React.FC = () => {
             className="text-base sm:text-lg font-bold text-slate-900 mt-6 mb-2 border-b border-slate-200 pb-1.5 flex items-center gap-2"
           >
             <span className="w-1.5 h-4 bg-indigo-600 rounded"></span>
-            <span>{line.replace('### ', '')}</span>
+            <span>{renderInline(line.replace('### ', ''))}</span>
           </h3>
         );
       } else if (line.startsWith('#### ')) {
         elements.push(
           <h4 key={index} className="text-sm font-bold text-indigo-700 mt-4 mb-1.5">
-            {line.replace('#### ', '')}
+            {renderInline(line.replace('#### ', ''))}
           </h4>
         );
       } else if (line.startsWith('- ')) {
         elements.push(
           <li key={index} className="text-xs sm:text-sm text-slate-700 ml-5 list-disc leading-relaxed my-0.5">
-            {line.replace('- ', '')}
+            {renderInline(line.replace('- ', ''))}
           </li>
         );
       } else if (line.startsWith('```')) {
@@ -139,7 +144,7 @@ export const DeliverablesView: React.FC = () => {
       } else if (line.trim().length > 0) {
         elements.push(
           <p key={index} className="text-xs sm:text-sm text-slate-700 leading-relaxed my-2">
-            {line}
+            {renderInline(line)}
           </p>
         );
       }

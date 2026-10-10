@@ -286,6 +286,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(103, 202, 16
 body { color: #26392e; background: #f5f7f2; }
 .workspace-shell { min-height: 100vh; background: radial-gradient(ellipse at 10% 0%, rgba(220, 236, 218, .34), transparent 32%), #f5f7f2; }
 .app-content { width: min(100%, 1480px); padding-top: clamp(22px, 3vw, 42px); padding-bottom: clamp(30px, 4vw, 56px); }
+.tutor-home { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr); gap: clamp(20px, 2vw, 28px); }
+.tutor-home > * { min-width: 0; margin: 0; }
+.tutor-form { width: 100%; max-width: 72rem; margin-inline: auto; }
+.tutor-progress-steps > button:disabled[aria-current="step"] { opacity: 1; }
+.tutor-progress-steps > button:disabled:not([aria-current="step"]) { border: 1px solid #e0e7df; color: #586b5e; background: #f0f4ef; opacity: 1; }
 .app-navigation { background: rgba(255, 255, 255, .93); border-color: #e0e7df; box-shadow: 0 5px 24px rgba(47, 69, 53, .045); backdrop-filter: blur(16px); }
 .workspace-brand-mark { background: linear-gradient(145deg, #668b68, #355b42); border: 1px solid rgba(53, 91, 66, .18); border-radius: 15px; box-shadow: 0 5px 12px rgba(53, 91, 66, .15); letter-spacing: -.04em; }
 .workspace-shell footer { background: rgba(255,255,255,.8); border-color: #e0e7df; }
@@ -320,6 +325,16 @@ body { color: #26392e; background: #f5f7f2; }
   .app-content { padding-top: 20px; padding-bottom: 32px; }
   .workspace-shell .rounded-2xl { border-radius: 17px; }
   .workspace-shell nav[aria-label="Pestañas de administración"] { margin-right: -1rem; padding-right: 1rem; }
+}
+@media (min-width: 761px) {
+  .app-navigation--tutor > div:first-child > div:last-child { margin-left: auto; }
+}
+@media (min-width: 1100px) {
+  .tutor-home { grid-template-columns: minmax(0, 1.7fr) minmax(340px, .9fr); align-items: start; }
+  .tutor-home > section > div:first-child { flex-direction: column; align-items: stretch; }
+  .tutor-home > section > div:first-child > label { align-self: flex-end; }
+  .tutor-progress-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); align-items: stretch; }
+  .tutor-progress-steps > button { min-width: 0; min-height: 44px; justify-content: center; text-align: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .workspace-shell main > .space-y-6,

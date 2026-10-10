@@ -480,7 +480,7 @@ export const TutorDataEntryFlow: React.FC = () => {
 
   if (phase === 'home') {
     return (
-      <div className="mx-auto max-w-5xl space-y-7">
+      <div className="tutor-home mx-auto max-w-7xl">
         <header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-900"><ShieldCheck size={15} aria-hidden="true" />Espacio de formularios del tutor</div>
           <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">¿Qué formulario vas a completar?</h1>
@@ -550,7 +550,7 @@ export const TutorDataEntryFlow: React.FC = () => {
       : `${activeQuestion?.code || ''} · Pregunta ${stepIndex} de ${relevantQuestions.length}`;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="tutor-form mx-auto max-w-6xl space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button type="button" onClick={returnToHome} className="inline-flex min-h-12 w-fit items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />Volver a formularios</button>
         <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">{editingSession ? `Editando ${editingSession.instrumentCode}` : instrumentInfo.title}</span>
@@ -564,7 +564,7 @@ export const TutorDataEntryFlow: React.FC = () => {
         <div className="mt-6" aria-label={`Progreso: ${progressPercent}%`}>
           <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-600"><span>Paso {stepIndex + 1} de {reviewStepIndex + 1}</span><span>{progressPercent}%</span></div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-700 transition-all" style={{ width: `${progressPercent}%` }} /></div>
-          <nav aria-label="Pasos del formulario" className="mt-3 flex flex-wrap gap-2">
+          <nav aria-label="Pasos del formulario" className="tutor-progress-steps mt-3 flex flex-wrap gap-2">
             {progressLabels.map((label, index) => <button key={`${index}-${label}`} type="button" disabled={index >= stepIndex} aria-current={index === stepIndex ? 'step' : undefined} onClick={() => setStepIndex(index)} className={`min-h-10 rounded-lg px-3 text-xs font-bold ${index === stepIndex ? 'bg-emerald-800 text-white' : index < stepIndex ? 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100' : 'cursor-not-allowed bg-slate-50 text-slate-400'}`}>{label}</button>)}
           </nav>
         </div>

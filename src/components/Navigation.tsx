@@ -162,13 +162,13 @@ export const Navigation: React.FC = () => {
   };
 
   return (
-    <header className="app-navigation bg-white border-b border-slate-200 text-slate-900 sticky top-0 z-40 shadow-xs">
+    <header className={`app-navigation ${user.role === 'tutor' ? 'app-navigation--tutor' : ''} bg-white border-b border-slate-200 text-slate-900 sticky top-0 z-40 shadow-xs`}>
       <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="workspace-brand-mark w-10 h-10 rounded-xl bg-emerald-900 text-white flex items-center justify-center font-black tracking-tight text-sm shadow-xs">ROCAS</div>
+          <div className="workspace-brand-mark w-10 h-10 rounded-xl bg-emerald-900 text-white flex items-center justify-center font-black tracking-tight text-sm shadow-xs">S</div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-base font-extrabold text-slate-900 tracking-tight">SISTEMA ROCAS</span>
+              <span className="text-base font-extrabold text-slate-900 tracking-tight">SIMECT</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">Gestión y Análisis Cualitativo STI</span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">Investigación Educativa: Experiencias, Percepciones y Dificultades con el Sistema Tutor Inteligente</p>

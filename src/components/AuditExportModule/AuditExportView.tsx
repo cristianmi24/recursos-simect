@@ -54,7 +54,7 @@ export const AuditExportView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `SISTEMA_ROCAS_STI_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `SIMECT_STI_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -95,7 +95,7 @@ export const AuditExportView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ROCAS_FRAGMENTOS_CODIFICADOS_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `SIMECT_FRAGMENTOS_CODIFICADOS_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -116,7 +116,7 @@ export const AuditExportView: React.FC = () => {
       if (success) {
         setImportStatus('Se importaron las matrices analíticas; formularios y bitácora permanecen intactos.');
       } else {
-        setImportStatus('❌ Error: El archivo no tiene el formato JSON válido del Sistema ROCAS.');
+        setImportStatus('❌ Error: El archivo no tiene el formato JSON válido de SIMECT.');
       }
       setTimeout(() => setImportStatus(null), 4000);
     };

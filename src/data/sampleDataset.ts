@@ -628,7 +628,7 @@ export const INITIAL_TRIANGULATION_ENTRIES: TriangulationMatrixEntry[] = [
     absenceOfEvidenceNotes: 'Todas las fuentes cuentan con evidencia primaria suficiente para esta categoría central.',
     researcherInterpretation: 'La autorregulación con el STI no es una cualidad estática del estudiante, sino una competencia emergente que depende críticamente del estilo del feedback: cuando el andamiaje es socrático, requiere acompañamiento docente inicial para no degenerar en frustración ciega.',
     pendingQuestions: '¿En qué medida el nivel previo de competencia lectora condiciona que el estudiante interprete la pista socrática como una ayuda o como una barrera punitiva?',
-    lastUpdatedBy: 'Dra. Elena Restrepo & Equipo ROCAS',
+    lastUpdatedBy: 'Dra. Elena Restrepo & Equipo SIMECT',
     updatedAt: '2026-10-06T11:20:00Z'
   },
   {
@@ -672,7 +672,7 @@ export const INITIAL_TRIANGULATION_ENTRIES: TriangulationMatrixEntry[] = [
     absenceOfEvidenceNotes: 'Información registrada y contrastada en las tres fuentes empíricas.',
     researcherInterpretation: 'La frustración es un indicador diagnóstico crucial: señala la zona de ruptura del andamiaje donde el STI deja de ser un tutor socrático y es percibido como un evaluador punitivo.',
     pendingQuestions: '¿Cuál es el umbral óptimo de intentos fallidos antes de que el STI deba ofrecer la respuesta comentada en lugar de una pista adicional?',
-    lastUpdatedBy: 'Equipo Metodológico ROCAS',
+    lastUpdatedBy: 'Equipo Metodológico SIMECT',
     updatedAt: '2026-10-07T09:40:00Z'
   },
   {
@@ -706,7 +706,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     action: 'system_reset',
     entityType: 'system',
     entityId: 'sys-core',
-    researcher: 'Equipo Metodológico ROCAS',
+    researcher: 'Equipo Metodológico SIMECT',
     summary: 'Inicialización de la plataforma y precarga de los 3 instrumentos (OBS1-8, GF1-10, E1-5) y 24 categorías de análisis.'
   },
   {

@@ -1,4 +1,4 @@
--- ROCAS: ejecutar como propietario de neondb después de crear estos roles
+-- SIMECT: ejecutar como propietario de neondb después de crear estos roles
 -- desde SQL (no desde Neon Console, CLI ni API):
 --   rocas_runtime_app
 --   rocas_provisioner_app

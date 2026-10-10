@@ -18,7 +18,7 @@ export const NotFoundPage: React.FC = () => (
         <span>Volver al inicio</span>
         <ArrowLeft className="not-found-home-arrow" aria-hidden="true" />
       </a>
-      <p className="not-found-foot">ROCAS <span>·</span> Investigación educativa</p>
+      <p className="not-found-foot">SIMECT <span>·</span> Investigación educativa</p>
     </section>
   </main>
 );

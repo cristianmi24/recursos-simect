@@ -34,13 +34,14 @@ const roleChoices: { id: AuthRole; title: string; description: string; Icon: typ
 ];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => {
-  const { login, retrySession } = useAuth();
+  const { login, loginDemo, retrySession } = useAuth();
   const [role, setRole] = useState<AuthRole>('tutor');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const showDemoAccess = configured !== true;
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -59,12 +60,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
 
   return (
     <main className="auth-page">
-      <section className="auth-story" aria-label="Sistema ROCAS">
+      <section className="auth-story" aria-label="SIMECT">
         <div className="auth-story-shade" />
         <div className="auth-brand">
-          <div className="auth-mark" aria-hidden="true"><span>R</span><i /></div>
+          <div className="auth-mark" aria-hidden="true"><span>S</span><i /></div>
           <div>
-            <div className="auth-brand-name">ROCAS <span>STI</span></div>
+            <div className="auth-brand-name">SIMECT <span>STI</span></div>
             <div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div>
           </div>
         </div>
@@ -80,7 +81,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
 
         <div className="auth-story-foot">
           <span className="auth-secure-dot" />
-          <span>Acceso protegido · Sistema ROCAS</span>
+          <span>Acceso protegido · SIMECT</span>
           <span className="auth-foot-rule" />
           <span>STI / 2026</span>
         </div>
@@ -89,8 +90,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
       <section className="auth-panel">
         <div className="auth-panel-inner">
           <div className="auth-mobile-brand">
-            <div className="auth-mark" aria-hidden="true"><span>R</span><i /></div>
-            <div><div className="auth-brand-name">ROCAS <span>STI</span></div><div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div></div>
+            <div className="auth-mark" aria-hidden="true"><span>S</span><i /></div>
+            <div><div className="auth-brand-name">SIMECT <span>STI</span></div><div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div></div>
           </div>
           <div className="auth-panel-overline">PORTAL DE ACCESO <span>01 / 02</span></div>
           <h2>Bienvenido<span className="auth-period">.</span></h2>
@@ -162,7 +163,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
               <div className="auth-offline" role="status"><span className="auth-offline-indicator" aria-hidden="true" /><div><strong>Servicio de acceso no disponible</strong><p>Comprueba tu conexión e inténtalo de nuevo.</p><button type="button" onClick={() => void retrySession()}><RefreshCw size={13} aria-hidden="true" /> Reintentar conexión</button></div></div>
             )}
             {configured === false && (
-              <div className="auth-setup-note" role="status">El acceso todavía no está habilitado. Solicita a coordinación que active las cuentas autorizadas.</div>
+              <div className="auth-setup-note" role="status">La autenticación real de Neon no está configurada. Usa las entradas rápidas para revisar la interfaz; no son cuentas reales.</div>
             )}
 
             <button className="auth-submit" type="submit" disabled={busy || configured === false}>
@@ -171,9 +172,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
             </button>
           </form>
 
+          {showDemoAccess && (
+            <section className="auth-demo-access" aria-label="Entradas rápidas de revisión">
+              <div className="auth-demo-heading">
+                <strong>Entrada rápida de revisión</strong>
+                <span>Sin conexión a Neon</span>
+              </div>
+              <div className="auth-demo-buttons">
+                <button type="button" className="auth-demo-button" onClick={() => loginDemo('admin')}>
+                  <ShieldCheck size={16} aria-hidden="true" />
+                  <span>Entrar como Administración</span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </button>
+                <button type="button" className="auth-demo-button auth-demo-button--tutor" onClick={() => loginDemo('tutor')}>
+                  <GraduationCap size={16} aria-hidden="true" />
+                  <span>Entrar como Tutor</span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </button>
+              </div>
+              <p>Modo de prueba local: los cambios se pierden al recargar y no se guardan en la base.</p>
+            </section>
+          )}
+
           <div className="auth-no-account"><span>¿No tienes una cuenta?</span> Solicita acceso a la coordinación.</div>
           <div className="auth-panel-security"><LockKeyhole size={13} /><span>Conexión protegida</span><span className="auth-security-separator">·</span><span>Tu sesión es privada</span></div>
-          <div className="auth-copyright">© 2026 ROCAS · Gestión y análisis cualitativo STI</div>
+          <div className="auth-copyright">© 2026 SIMECT · Gestión y análisis cualitativo STI</div>
         </div>
         <div className="auth-mobile-backdrop" aria-hidden="true" />
       </section>

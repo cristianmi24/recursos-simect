@@ -258,7 +258,7 @@ Verificadas empíricamente mediante triangulación de fuentes.`;
         {/* Document Header */}
         <div className="border-b border-slate-200 pb-5 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-500">
-            <span className="font-bold text-slate-700">SISTEMA ROCAS • INVESTIGACIÓN STI</span>
+            <span className="font-bold text-slate-700">SIMECT • INVESTIGACIÓN STI</span>
             <span>Fecha de emisión: {new Date().toLocaleDateString()}</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900">
@@ -467,7 +467,7 @@ Verificadas empíricamente mediante triangulación de fuentes.`;
             </p>
             <p className="leading-relaxed">
               <strong>Trazabilidad metodológica:</strong> Cada afirmación de este reporte está anclada
-              en los registros de campo originales y ha sido auditada por el equipo metodológico ROCAS
+              en los registros de campo originales y ha sido auditada por el equipo metodológico SIMECT
               bajo los criterios de credibilidad y confirmabilidad cualitativa.
             </p>
             <div className="pt-2 border-t border-indigo-200 flex items-center justify-between text-[11px] text-slate-500">

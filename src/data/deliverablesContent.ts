@@ -11,11 +11,11 @@ export const DELIVERABLES_DATA: DeliverableSection[] = [
   {
     id: 'entregable-1',
     number: 1,
-    title: 'Entregable 1. Especificación Funcional del Sistema ROCAS',
+    title: 'Entregable 1. Especificación Funcional del SIMECT',
     subtitle: 'Propósito, Perfiles de Usuario, Módulos y Fronteras Metodológicas',
     summary: 'Define el marco epistemológico, roles del equipo interdisciplinario, arquitectura de módulos y los límites inviolables entre recolección fáctica e interpretación analítica.',
     contentMarkdown: `### 1. Propósito del Sistema
-El **Sistema ROCAS (Registro, Organización, Categorización y Análisis del STI)** es un entorno digital de investigación cualitativa diseñado específicamente para gestionar, codificar y triangular la información empírica obtenida en el estudio de las **experiencias, percepciones y dificultades** de los estudiantes al interactuar con un Sistema Tutor Inteligente (STI) orientado al desarrollo del pensamiento crítico y la metacognición.
+El **SIMECT** es un entorno digital de investigación cualitativa diseñado específicamente para gestionar, codificar y triangular la información empírica obtenida en el estudio de las **experiencias, percepciones y dificultades** de los estudiantes al interactuar con un Sistema Tutor Inteligente (STI) orientado al desarrollo del pensamiento crítico y la metacognición.
 
 El sistema no opera como un simple repositorio pasivo ni como una caja negra automatizada. Su propósito central es **apoyar el juicio metodológico del equipo investigador**, garantizar la **trazabilidad auditada** desde el fragmento textual o la conducta observada hasta las conclusiones teóricas, y posibilitar la triangulación sistemática entre tres fuentes complementarias:
 1. **Observación estructurada (OBS1–OBS8)**: Registro de conducta observable directa.
@@ -80,7 +80,7 @@ Las funciones siguientes describen responsabilidades del equipo investigador, no
     title: 'Entregable 2. Matriz Maestra de Categorías y Subcategorías',
     subtitle: 'Estructura Jerárquica, Definiciones Operacionales y Criterios de Inclusión/Exclusión',
     summary: 'Presenta el libro de códigos completo (Codebook) con 24 categorías distribuidas en 3 familias centrales (EXP, PER, DIF) y 2 dimensiones transversales (PC, META).',
-    contentMarkdown: `### Matriz Maestra del Sistema ROCAS
+    contentMarkdown: `### Matriz Maestra del SIMECT
 
 A continuación se detalla la configuración del sistema de categorías. Todos los ejemplos han sido formulados con fines ilustrativos y están **explícitamente identificados como ficticios**.
 

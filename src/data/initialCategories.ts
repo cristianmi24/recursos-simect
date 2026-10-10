@@ -16,9 +16,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Trabajar hoy con el tutor fue muy diferente a la clase normal; me sentí concentrado porque nadie me apuraba."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -33,9 +33,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] El estudiante interactúa con el botón de pistas cada vez que llega al paso de deducción lógica.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -50,9 +50,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación: El estudiante tarda 90 segundos revisando la tabla de premisas antes de seleccionar la primera inferencia.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -67,9 +67,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Antes de marcar, comparé las dos opciones porque ambas parecían lógicas, pero una tenía un contraejemplo."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -84,9 +84,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Pensé que tenía la razón al 100%, pero la pista me mostró un caso donde fallaba y tuve que frenar."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -101,9 +101,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación: El estudiante despliega la barra de herramientas y la guía de pasos antes de pulsar «Iniciar ejercicio».',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -118,9 +118,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Miraba cada dos ejercicios la barra de nivel para ver si estaba cometiendo menos fallas en las justificaciones."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -135,9 +135,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación: Tras el fallo, el estudiante no reintentó inmediatamente; regresó al concepto teórico, leyó el ejemplo y luego reformuló.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -152,9 +152,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación (OBS8): El estudiante asiente con la cabeza al leer la pista y abre la ventana explicativa del error.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
 
@@ -173,9 +173,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Sentí que el programa me exigía justificar cada paso, no bastaba con adivinar."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -190,9 +190,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "El tutor me mostró que el personaje tenía motivos que yo no había considerado en mi primer análisis."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -207,9 +207,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Me di cuenta de que tiendo a asumir cosas sin mirar las excepciones; el sistema me hizo consciente de esa trampa mía."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -224,9 +224,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Las preguntas del tutor funcionaban como una voz interna que me decía: ¿estás seguro de esa conclusión?"',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -241,9 +241,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Sentí que cuando fallaba en premisas me daba ejemplos más simples, pero a mi compañero le dio retos más avanzados."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -258,9 +258,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Es una herramienta muy útil porque da feedback inmediato sin juzgarte como a veces pasa con un examen."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -275,9 +275,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Le agregaría la opción de pedirle al tutor que me explique el error con un diagrama visual."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
 
@@ -296,9 +296,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación: El estudiante hizo clic cuatro veces en el texto antes de percatarse de que debía arrastrar el bloque.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -313,9 +313,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "No entendí al principio qué era una falacia ad hominem porque la instrucción usaba palabras muy enredadas."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -330,9 +330,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "El sistema me decía que mi respuesta no era válida, pero no me decía en qué parte del silogismo estaba el fallo."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -347,9 +347,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación (OBS6): El estudiante recibió error y volvió a marcar la misma alternativa errada tres veces seguidas.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -364,9 +364,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Me dio rabia cuando insistía en que mi argumento era débil cuando para mí tenía sentido; sentí ganas de cerrar todo."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -381,9 +381,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Necesitamos que el tutor permita escribir argumentos abiertos con nuestras palabras y no solo elegir opciones cerradas."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
 
@@ -403,9 +403,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Separé lo que decía el texto en dos partes para ver si la conclusión se deducía realmente de los hechos."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -421,9 +421,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Probé mentalmente qué pasaría si la premisa fuera falsa para ver si el contraargumento sostenía la tesis."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -439,9 +439,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Aunque mi postura era opuesta, la objeción del tutor me hizo ver que el otro grupo tenía un punto razonable."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -457,9 +457,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "¿Por qué el tutor asume que esa premisa es universal si en el contexto de Colombia tiene excepciones?"',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -475,9 +475,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] Observación (OBS4): El estudiante organiza sus hojas de notas físicas y repasa el índice antes de empezar el módulo.',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -493,9 +493,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Me di cuenta a mitad de camino de que estaba adivinando en vez de aplicar la regla que el tutor explicó."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   },
   {
@@ -511,9 +511,9 @@ export const INITIAL_CATEGORIES: CategoryDefinition[] = [
     illustrativeExample: '[Ficticio] "Cuando el tutor me avisó del fallo, en vez de volver a probar cambié de táctica: leí primero la conclusión y fui hacia atrás."',
     auditTrail: {
       createdDate: '2026-10-01',
-      createdBy: 'Equipo Metodológico ROCAS',
+      createdBy: 'Equipo Metodológico SIMECT',
       lastModifiedDate: '2026-10-01',
-      lastModifiedBy: 'Equipo Metodológico ROCAS'
+      lastModifiedBy: 'Equipo Metodológico SIMECT'
     }
   }
 ];

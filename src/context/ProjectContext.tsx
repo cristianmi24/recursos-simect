@@ -14,6 +14,7 @@ import { INITIAL_QUESTIONS } from '../data/initialInstruments';
 import { INITIAL_CATEGORIES } from '../data/initialCategories';
 
 export type ActiveTab =
+  | 'dashboard'
   | 'intake'
   | 'categories'
   | 'coding'
@@ -136,7 +137,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [currentResearcher] = useState<string>(user.name);
   const [isPseudonymized, setIsPseudonymized] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('intake');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(user.role === 'admin' ? 'dashboard' : 'intake');
   const [appMode, setAppMode] = useState<AppMode>(initialMode);
   const [dataStatus, setDataStatus] = useState<DataStatus>('loading');
   const [dataError, setDataError] = useState('');

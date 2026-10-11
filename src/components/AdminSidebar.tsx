@@ -7,6 +7,7 @@ import {
   FileText,
   FolderTree,
   GitCompare,
+  LayoutDashboard,
   ShieldCheck,
   Tag,
   Users,
@@ -47,12 +48,16 @@ export const AdminSidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => 
   const pending = codedFragments.filter((fragment) => fragment.status === 'propuesta_pendiente').length;
   const groups: { title: string; items: SidebarItem[] }[] = [
     {
+      title: 'Panel',
+      items: [{ id: 'dashboard', label: 'Panel', hint: 'Formularios por institución', tone: 'sage', icon: <LayoutDashboard aria-hidden="true" />, badge: sessions.length }]
+    },
+    {
       title: 'Análisis',
       items: [
         { id: 'categories', label: 'Categorías', hint: 'Matriz analítica', tone: 'teal', icon: <FolderTree aria-hidden="true" />, badge: categories.length },
         { id: 'coding', label: 'Codificación', hint: pending > 0 ? `${pending} por revisar` : 'Análisis cualitativo', tone: 'violet', icon: <Tag aria-hidden="true" />, badge: pending > 0 ? pending : codedFragments.length, alert: pending > 0 },
         { id: 'triangulation', label: 'Triangulación', hint: 'Matriz cruzada', tone: 'plum', icon: <GitCompare aria-hidden="true" />, badge: triangulationEntries.length },
-        { id: 'reports', label: 'Reportes', hint: 'Informes analíticos', tone: 'ochre', icon: <FileText aria-hidden="true" />, badge: 8 }
+        { id: 'reports', label: 'Reportes', hint: 'Informes analíticos', tone: 'ochre', icon: <FileText aria-hidden="true" />, badge: 6 }
       ]
     },
     {

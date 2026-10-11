@@ -11,8 +11,9 @@ import {
   X
 } from 'lucide-react';
 
-const SHORTCUT_TABS: ActiveTab[] = ['categories', 'coding', 'triangulation', 'reports', 'intake', 'audit', 'users'];
+const SHORTCUT_TABS: ActiveTab[] = ['dashboard', 'categories', 'coding', 'triangulation', 'reports', 'intake', 'audit', 'users'];
 const BREADCRUMB_LABELS: Record<ActiveTab, string> = {
+  dashboard: 'Panel',
   categories: 'Categorías',
   coding: 'Codificación',
   triangulation: 'Triangulación',
@@ -125,7 +126,7 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
       } else if (shortcutKey === 'a') {
         event.preventDefault();
         setAppMode('admin');
-        if (activeTab === 'intake') setActiveTab('categories');
+        if (activeTab === 'intake') setActiveTab('dashboard');
       }
       shortcutPrefixRef.current = false;
       setShortcutPrefix(false);
@@ -182,7 +183,7 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
               <button
                 type="button"
                 aria-pressed={appMode === 'admin'}
-                onClick={() => { setAppMode('admin'); if (activeTab === 'intake') setActiveTab('categories'); }}
+                onClick={() => { setAppMode('admin'); if (activeTab === 'intake') setActiveTab('dashboard'); }}
                 className="mode-switch-option mode-switch-option--admin"
               >
                 <LayoutDashboard className="w-3.5 h-3.5" /><span>Administración</span>

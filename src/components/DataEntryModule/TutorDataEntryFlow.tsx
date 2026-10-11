@@ -441,10 +441,6 @@ export const TutorDataEntryFlow: React.FC = () => {
           <label htmlFor={`tutor-${question.id}-response`} className="block text-sm font-semibold text-slate-800">Transcripción de la respuesta {record.audioKey ? <span className="font-normal text-slate-500">(opcional con audio)</span> : <span aria-hidden="true">*</span>}</label>
           <textarea id={`tutor-${question.id}-response`} required={!record.audioKey} maxLength={10000} rows={6} value={record.verbatimResponse} onChange={(event) => updateInterview(question.id, { verbatimResponse: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-teal-700" placeholder="Transcribe con fidelidad la respuesta del estudiante." />
         </div>
-        <div className="space-y-2">
-          <label htmlFor={`tutor-${question.id}-probing`} className="block text-sm font-semibold text-slate-800">Preguntas de profundización <span className="font-normal text-slate-500">(opcional)</span></label>
-          <textarea id={`tutor-${question.id}-probing`} maxLength={4000} rows={3} value={record.probingQuestions || ''} onChange={(event) => updateInterview(question.id, { probingQuestions: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-teal-700" />
-        </div>
       </div>
     );
   };
@@ -462,7 +458,7 @@ export const TutorDataEntryFlow: React.FC = () => {
       answer = <><ul className="space-y-3">{record?.turns.map((turn, index) => <li key={turn.id} className="rounded-lg bg-white p-3"><strong>Intervención {index + 1} · {turn.participantPseudonym || 'Sin seudónimo'}</strong><p className="mt-1 whitespace-pre-wrap">{turn.text || 'Sin transcripción'}</p></li>)}</ul>{record?.moderatorNotes && <p className="mt-2"><strong>Notas del moderador:</strong> {record.moderatorNotes}</p>}</>;
     } else {
       const record = draft.interviewRecords?.[question.id];
-      answer = <>{record?.audioKey && <div className="mb-2"><StoredAudioPlayer audioKey={record.audioKey} /></div>}<p className="whitespace-pre-wrap">{record?.verbatimResponse || (record?.audioKey ? 'Sin transcripción (solo audio)' : 'Sin dato')}</p>{record?.probingQuestions && <p className="mt-2"><strong>Repreguntas:</strong> {record.probingQuestions}</p>}</>;
+      answer = <>{record?.audioKey && <div className="mb-2"><StoredAudioPlayer audioKey={record.audioKey} /></div>}<p className="whitespace-pre-wrap">{record?.verbatimResponse || (record?.audioKey ? 'Sin transcripción (solo audio)' : 'Sin dato')}</p></>;
     }
     return (
       <section key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">

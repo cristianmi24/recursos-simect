@@ -409,7 +409,12 @@ app.get('/api/audio/url', async (req, res) => {
     return;
   }
   try {
-    const url = await getSignedUrl(r2Client, new GetObjectCommand({ Bucket: r2Bucket, Key: key }), { expiresIn: 300 });
+    const name = typeof req.query.name === 'string' ? req.query.name.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 100) : '';
+    const url = await getSignedUrl(r2Client, new GetObjectCommand({
+      Bucket: r2Bucket,
+      Key: key,
+      ...(req.query.download === '1' ? { ResponseContentDisposition: `attachment; filename="${name || key.split('/').pop()}"` } : {})
+    }), { expiresIn: 300 });
     res.json({ url });
   } catch (error) {
     console.error('No se pudo firmar la lectura de audio.', error instanceof Error ? error.message : 'Error desconocido');

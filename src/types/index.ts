@@ -40,6 +40,9 @@ export interface InterviewRecord {
   verbatimResponse: string; // Textual student answer
   probingQuestions?: string; // Follow-up / deepening questions asked by researcher
   contextualNotes: string;
+  audioKey?: string; // Clave del audio en el bucket de Cloudflare R2
+  audioMime?: string;
+  audioSeconds?: number;
 }
 
 export interface ResearchSession {
@@ -77,10 +80,10 @@ export type ResearchSessionDraft = Omit<
   'id' | 'instrumentCode' | 'researcherName' | 'createdAt' | 'updatedAt'
 > & Partial<Pick<ResearchSession, 'id' | 'instrumentCode' | 'researcherName' | 'createdAt' | 'updatedAt'>>;
 
-export type CategoryFamily = 'EXP' | 'PER' | 'DIF' | 'PC' | 'META';
+export type CategoryFamily = 'EXP' | 'PER' | 'DIF';
 
 export interface CategoryDefinition {
-  id: string; // e.g., 'EXP-GEN', 'PC-EVAL'
+  id: string; // e.g., 'EXP-GEN', 'PER-PC'
   family: CategoryFamily;
   code: string;
   name: string;

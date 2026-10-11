@@ -247,11 +247,11 @@ export const DataEntryView: React.FC = () => {
           {user?.role === 'admin' && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row lg:flex-col items-start gap-3 shrink-0">
               <div>
-                <span className="text-xs font-bold text-slate-900 block">¿Desea ver los análisis y entregables?</span>
-                <span className="text-[11px] text-slate-500 block">Consulte los 8 Entregables y la Triangulación</span>
+                <span className="text-xs font-bold text-slate-900 block">¿Desea ver los análisis?</span>
+                <span className="text-[11px] text-slate-500 block">Consulte las categorías y la Triangulación</span>
               </div>
               <button
-                onClick={() => { setAppMode('admin'); setActiveTab('deliverables'); }}
+                onClick={() => { setAppMode('admin'); setActiveTab('categories'); }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors w-full justify-center"
               >
                 <span>Ir al Módulo Administrador</span><ArrowRight className="w-3.5 h-3.5" />
@@ -303,44 +303,7 @@ export const DataEntryView: React.FC = () => {
               </div>
             </button>
 
-            {/* 2. GF */}
-            <button
-              type="button"
-              onClick={() => setSelectedInstrument('GF')}
-              className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                selectedInstrument === 'GF'
-                  ? 'bg-amber-50/70 border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
-                  : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-              }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
-                      selectedInstrument === 'GF'
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    GF1–GF10
-                  </span>
-                  <span className="text-xs font-semibold text-amber-700">
-                    10 Preguntas
-                  </span>
-                </div>
-                <h3 className="font-bold text-slate-900 text-sm mt-2">
-                  2. Grupo Focal
-                </h3>
-                <p className="text-xs text-slate-600 leading-snug">
-                  Formuladas oralmente a un grupo de estudiantes, registrando intervenciones por turnos.
-                </p>
-              </div>
-              <div className="mt-3 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500 font-medium">
-                {sessions.filter((s) => s.instrumentType === 'GF').length} registros entregados
-              </div>
-            </button>
-
-            {/* 3. E */}
+            {/* 2. E */}
             <button
               type="button"
               onClick={() => setSelectedInstrument('E')}
@@ -366,7 +329,7 @@ export const DataEntryView: React.FC = () => {
                   </span>
                 </div>
                 <h3 className="font-bold text-slate-900 text-sm mt-2">
-                  3. Entrevista Semiestructurada
+                  2. Entrevista Semiestructurada
                 </h3>
                 <p className="text-xs text-slate-600 leading-snug">
                   Formuladas individualmente a cada estudiante, capturando respuestas textuales en profundidad.
@@ -374,6 +337,43 @@ export const DataEntryView: React.FC = () => {
               </div>
               <div className="mt-3 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500 font-medium">
                 {sessions.filter((s) => s.instrumentType === 'E').length} registros entregados
+              </div>
+            </button>
+
+            {/* 3. GF */}
+            <button
+              type="button"
+              onClick={() => setSelectedInstrument('GF')}
+              className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                selectedInstrument === 'GF'
+                  ? 'bg-amber-50/70 border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
+                  : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+              }`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
+                      selectedInstrument === 'GF'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    GF1–GF10
+                  </span>
+                  <span className="text-xs font-semibold text-amber-700">
+                    10 Preguntas
+                  </span>
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm mt-2">
+                  3. Grupo Focal
+                </h3>
+                <p className="text-xs text-slate-600 leading-snug">
+                  Formuladas oralmente a un grupo de estudiantes, registrando intervenciones por turnos.
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500 font-medium">
+                {sessions.filter((s) => s.instrumentType === 'GF').length} registros entregados
               </div>
             </button>
           </div>

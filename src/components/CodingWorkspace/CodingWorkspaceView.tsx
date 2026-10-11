@@ -344,8 +344,8 @@ export const CodingWorkspaceView: React.FC = () => {
           >
             <option value="ALL">Todos los instrumentos</option>
             <option value="OBS">Solo Observación (OBS)</option>
-            <option value="GF">Solo Grupo Focal (GF)</option>
             <option value="E">Solo Entrevista (E)</option>
+            <option value="GF">Solo Grupo Focal (GF)</option>
           </select>
 
           <select

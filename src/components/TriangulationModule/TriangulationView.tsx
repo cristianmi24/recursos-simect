@@ -34,7 +34,7 @@ export const TriangulationView: React.FC = () => {
 
   // Form states
   const [formCategory, setFormCategory] = useState<string>('EXP-AUT');
-  const [formTransversal, setFormTransversal] = useState<string>('META-REG');
+  const [formTransversal, setFormTransversal] = useState<string>('');
   const [formObsSummary, setFormObsSummary] = useState('');
   const [formObsAvailable, setFormObsAvailable] = useState(true);
   const [formGfSummary, setFormGfSummary] = useState('');
@@ -64,7 +64,7 @@ export const TriangulationView: React.FC = () => {
   const handleOpenAdd = () => {
     setEditingEntry(null);
     setFormCategory('EXP-AUT');
-    setFormTransversal('META-REG');
+    setFormTransversal('');
     setFormObsSummary('');
     setFormObsAvailable(true);
     setFormGfSummary('');
@@ -314,34 +314,12 @@ export const TriangulationView: React.FC = () => {
                   </p>
                 </div>
 
-                {/* 2. GF Evidence */}
-                <div className="p-5 space-y-2 bg-amber-50/20">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-600"></span>
-                      <span>2. Grupo Focal (GF)</span>
-                    </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        entry.gfEvidenceAvailable
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {entry.gfEvidenceAvailable ? 'Voz colectiva' : 'Sin evidencia'}
-                    </span>
-                  </div>
-                  <p className="text-slate-800 leading-relaxed min-h-[50px]">
-                    {entry.gfEvidenceSummary || 'Sin datos registrados.'}
-                  </p>
-                </div>
-
                 {/* 3. Interview Evidence */}
                 <div className="p-5 space-y-2 bg-teal-50/20">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-teal-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-teal-600"></span>
-                      <span>3. Entrevista Semiestructurada (E)</span>
+                      <span>2. Entrevista Semiestructurada (E)</span>
                     </span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
@@ -355,6 +333,28 @@ export const TriangulationView: React.FC = () => {
                   </div>
                   <p className="text-slate-800 leading-relaxed min-h-[50px]">
                     {entry.interviewEvidenceSummary || 'Sin datos registrados.'}
+                  </p>
+                </div>
+
+                {/* 2. GF Evidence */}
+                <div className="p-5 space-y-2 bg-amber-50/20">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                      <span>3. Grupo Focal (GF)</span>
+                    </span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        entry.gfEvidenceAvailable
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      {entry.gfEvidenceAvailable ? 'Voz colectiva' : 'Sin evidencia'}
+                    </span>
+                  </div>
+                  <p className="text-slate-800 leading-relaxed min-h-[50px]">
+                    {entry.gfEvidenceSummary || 'Sin datos registrados.'}
                   </p>
                 </div>
               </div>
@@ -538,36 +538,11 @@ export const TriangulationView: React.FC = () => {
                   />
                 </div>
 
-                {/* GF */}
-                <div className="bg-amber-50/30 border border-amber-200 rounded-xl p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-amber-900 font-bold">
-                      2. Evidencia del Grupo Focal (GF):
-                    </label>
-                    <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer font-medium">
-                      <input
-                        type="checkbox"
-                        checked={formGfAvailable}
-                        onChange={(e) => setFormGfAvailable(e.target.checked)}
-                        className="rounded border-slate-300 text-amber-600"
-                      />
-                      <span>¿Hay evidencia disponible en GF?</span>
-                    </label>
-                  </div>
-                  <textarea
-                    rows={2}
-                    value={formGfSummary}
-                    onChange={(e) => setFormGfSummary(e.target.value)}
-                    placeholder="Resumen de las intervenciones colectivas..."
-                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none"
-                  />
-                </div>
-
                 {/* E */}
                 <div className="bg-teal-50/30 border border-teal-200 rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-teal-900 font-bold">
-                      3. Evidencia de la Entrevista Semiestructurada (E):
+                      2. Evidencia de la Entrevista Semiestructurada (E):
                     </label>
                     <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer font-medium">
                       <input
@@ -584,6 +559,31 @@ export const TriangulationView: React.FC = () => {
                     value={formInterviewSummary}
                     onChange={(e) => setFormInterviewSummary(e.target.value)}
                     placeholder="Resumen de las declaraciones individuales..."
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none"
+                  />
+                </div>
+
+                {/* GF */}
+                <div className="bg-amber-50/30 border border-amber-200 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-amber-900 font-bold">
+                      3. Evidencia del Grupo Focal (GF):
+                    </label>
+                    <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer font-medium">
+                      <input
+                        type="checkbox"
+                        checked={formGfAvailable}
+                        onChange={(e) => setFormGfAvailable(e.target.checked)}
+                        className="rounded border-slate-300 text-amber-600"
+                      />
+                      <span>¿Hay evidencia disponible en GF?</span>
+                    </label>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={formGfSummary}
+                    onChange={(e) => setFormGfSummary(e.target.value)}
+                    placeholder="Resumen de las intervenciones colectivas..."
                     className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none"
                   />
                 </div>

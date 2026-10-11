@@ -290,8 +290,8 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 outline-none"
                 >
                   <option value="OBS">Observación Estructurada (OBS1-OBS8)</option>
-                  <option value="GF">Grupo Focal (GF1-GF10)</option>
                   <option value="E">Entrevista Semiestructurada (E1-E5)</option>
+                  <option value="GF">Grupo Focal (GF1-GF10)</option>
                 </select>
               </div>
 
@@ -406,21 +406,6 @@ export const SessionModal: React.FC<SessionModalProps> = ({
                   />
                 </div>
               )}
-
-              <div className="sm:col-span-2">
-                <label htmlFor="admin-sti-task" className="block text-slate-600 font-semibold mb-1">
-                  Módulo o Tarea del Tutor Inteligente (STI)
-                </label>
-                <input
-                  id="admin-sti-task"
-                  type="text"
-                  required
-                  maxLength={240}
-                  value={stiVersionOrTask}
-                  onChange={(e) => setStiVersionOrTask(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:border-indigo-600 outline-none"
-                />
-              </div>
 
               <div className="sm:col-span-2">
                 <label htmlFor="admin-audio-reference" className="block text-slate-600 font-semibold mb-1">

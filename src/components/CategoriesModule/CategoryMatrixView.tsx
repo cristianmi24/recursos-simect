@@ -21,10 +21,31 @@ import {
 } from 'lucide-react';
 
 export const CategoryMatrixView: React.FC = () => {
-  const { categories, addCategory, updateCategory, deleteCategory, currentResearcher } =
+  const { questions, categories, addCategory, updateCategory, deleteCategory, currentResearcher } =
     useProject();
 
-  const [selectedFamily, setSelectedFamily] = useState<CategoryFamily | 'ALL'>('ALL');
+  type FormKey = 'ALL' | 'OBS' | 'E' | 'GF';
+  const FORM_PATTERNS: Record<Exclude<FormKey, 'ALL'>, RegExp> = {
+    OBS: /^OBS\d+$/,
+    E: /^E\d+$/,
+    GF: /^GF\d+$/
+  };
+  const indicatorsOfForm = (cat: CategoryDefinition, form: FormKey) =>
+    form === 'ALL' ? cat.relatedIndicators : cat.relatedIndicators.filter((i) => FORM_PATTERNS[form].test(i));
+  const formRank = (cat: CategoryDefinition) => {
+    const first = cat.relatedIndicators[0] || '';
+    const base = first.startsWith('OBS') ? 0 : first.startsWith('E') ? 1 : 2;
+    return base * 100 + (parseInt(first.replace(/\D/g, ''), 10) || 0);
+  };
+
+  const mainCategories: { key: CategoryFamily; label: string }[] = [
+    { key: 'EXP', label: 'Experiencias' },
+    { key: 'PER', label: 'Percepciones' },
+    { key: 'DIF', label: 'Dificultades' }
+  ];
+  const [expandedMain, setExpandedMain] = useState<CategoryFamily | null>('EXP');
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [selectedForm, setSelectedForm] = useState<FormKey>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(
     categories[0]?.id || null
@@ -46,50 +67,28 @@ export const CategoryMatrixView: React.FC = () => {
   const [formIndicators, setFormIndicators] = useState('OBS1, GF2, E3');
   const [formModificationReason, setFormModificationReason] = useState('');
 
-  const families: { key: CategoryFamily | 'ALL'; label: string; count: number }[] = [
-    { key: 'ALL', label: 'Todas las Familias', count: categories.length },
-    {
-      key: 'EXP',
-      label: 'EXP · Experiencias (9)',
-      count: categories.filter((c) => c.family === 'EXP').length
-    },
-    {
-      key: 'PER',
-      label: 'PER · Percepciones (7)',
-      count: categories.filter((c) => c.family === 'PER').length
-    },
-    {
-      key: 'DIF',
-      label: 'DIF · Dificultades (6)',
-      count: categories.filter((c) => c.family === 'DIF').length
-    },
-    {
-      key: 'PC',
-      label: 'PC · Pensamiento Crítico (4)',
-      count: categories.filter((c) => c.family === 'PC').length
-    },
-    {
-      key: 'META',
-      label: 'META · Metacognición (3)',
-      count: categories.filter((c) => c.family === 'META').length
-    }
+  const forms: { key: FormKey; label: string; count: number }[] = [
+    { key: 'ALL', label: 'Todos los formularios', count: categories.length },
+    { key: 'OBS', label: '1. Observación (OBS1–8)', count: categories.filter((c) => indicatorsOfForm(c, 'OBS').length > 0).length },
+    { key: 'E', label: '2. Entrevista (E1–5)', count: categories.filter((c) => indicatorsOfForm(c, 'E').length > 0).length },
+    { key: 'GF', label: '3. Grupo focal (GF1–10)', count: categories.filter((c) => indicatorsOfForm(c, 'GF').length > 0).length }
   ];
 
   const filteredCategories = categories.filter((c) => {
-    const matchesFamily = selectedFamily === 'ALL' || c.family === selectedFamily;
+    const matchesFamily = selectedForm === 'ALL' || indicatorsOfForm(c, selectedForm).length > 0;
     const matchesSearch =
       c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.operationalDefinition.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFamily && matchesSearch;
-  });
+  }).sort((a, b) => formRank(a) - formRank(b));
 
   const handleOpenAdd = () => {
     setEditingCategory(null);
-    setFormFamily(selectedFamily === 'ALL' ? 'EXP' : selectedFamily);
-    setFormCode(`${selectedFamily === 'ALL' ? 'EXP' : selectedFamily}-NUEVO`);
+    setFormFamily('EXP');
+    setFormCode('EXP-NUEVO');
     setFormName('');
-    setFormIsTransversal(selectedFamily === 'PC' || selectedFamily === 'META');
+    setFormIsTransversal(false);
     setFormDefinition('');
     setFormInclusion('');
     setFormExclusion('');
@@ -181,10 +180,6 @@ export const CategoryMatrixView: React.FC = () => {
         return 'text-emerald-800 bg-emerald-50 border-emerald-200';
       case 'DIF':
         return 'text-rose-800 bg-rose-50 border-rose-200';
-      case 'PC':
-        return 'text-purple-800 bg-purple-50 border-purple-200';
-      case 'META':
-        return 'text-amber-800 bg-amber-50 border-amber-200';
     }
   };
 
@@ -202,9 +197,9 @@ export const CategoryMatrixView: React.FC = () => {
               <span>Matriz Maestra de Categorías y Subcategorías (Codebook)</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">
-              Estructura jerárquica con 24 subcategorías operacionales organizadas en 3 familias centrales
-              (<strong>EXP</strong>: Experiencias, <strong>PER</strong>: Percepciones, <strong>DIF</strong>: Dificultades)
-              y 2 dimensiones transversales (<strong>PC</strong>: Pensamiento Crítico, <strong>META</strong>: Metacognición).
+              Subcategorías organizadas por formulario (Observación, Entrevista y Grupo focal) según la matriz de
+              categorización, dentro de 3 categorías principales (<strong>EXP</strong>: Experiencias,
+              <strong> PER</strong>: Percepciones, <strong>DIF</strong>: Dificultades).
               Todas las modificaciones quedan registradas con firma y motivo de auditoría.
             </p>
           </div>
@@ -218,19 +213,19 @@ export const CategoryMatrixView: React.FC = () => {
           </button>
         </div>
 
-        {/* Family Pills Selector */}
+        {/* Formulario Pills Selector */}
         <div className="flex flex-wrap gap-2 mt-5 pt-4 border-t border-slate-100">
-          {families.map((fam) => (
+          {forms.map((fam) => (
             <button
               key={fam.key}
-              onClick={() => setSelectedFamily(fam.key)}
+              onClick={() => setSelectedForm(fam.key)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                selectedFamily === fam.key
+                selectedForm === fam.key
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
               }`}
             >
-              {fam.label}
+              {fam.label} ({fam.count})
             </button>
           ))}
         </div>
@@ -244,172 +239,194 @@ export const CategoryMatrixView: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por código, nombre o definición operacional..."
+            placeholder="Buscar por pregunta, código o subcategoría..."
             className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-9 pr-3 py-1.5 text-slate-800 placeholder-slate-400 focus:border-indigo-600 focus:bg-white outline-none"
           />
         </div>
 
         <div className="text-slate-500 text-[11px]">
-          Mostrando <strong>{filteredCategories.length}</strong> de {categories.length} categorías en el Codebook
+          {categories.length} subcategorías en el Codebook
         </div>
       </div>
 
-      {/* Category List Accordion */}
+      {/* Categorías principales → preguntas → subcategoría */}
       <div className="space-y-3">
-        {filteredCategories.map((cat) => {
-          const isExpanded = expandedCategoryId === cat.id;
-          const familyBadgeStyle = getFamilyColor(cat.family);
+        {mainCategories.map((main) => {
+          const rows = questions
+            .filter((q) => {
+              const cat = categories.find((c) => c.id === q.linkedCategories?.[0]);
+              if (!cat || cat.family !== main.key) return false;
+              if (selectedForm !== 'ALL' && q.instrumentType !== selectedForm) return false;
+              const term = searchTerm.trim().toLowerCase();
+              return (
+                !term ||
+                q.code.toLowerCase().includes(term) ||
+                q.prompt.toLowerCase().includes(term) ||
+                cat.name.toLowerCase().includes(term) ||
+                cat.code.toLowerCase().includes(term)
+              );
+            })
+            .sort((a, b) => a.order - b.order);
+          const isMainOpen = expandedMain === main.key;
 
           return (
             <div
-              key={cat.id}
-              className={`bg-white border rounded-xl overflow-hidden transition-all shadow-xs ${
-                isExpanded
-                  ? 'border-indigo-300 ring-2 ring-indigo-500/10'
-                  : 'border-slate-200 hover:border-slate-300'
+              key={main.key}
+              className={`bg-white border rounded-xl overflow-hidden shadow-xs ${
+                isMainOpen ? 'border-indigo-300 ring-2 ring-indigo-500/10' : 'border-slate-200'
               }`}
             >
-              {/* Accordion Header */}
               <div
-                onClick={() =>
-                  setExpandedCategoryId(isExpanded ? null : cat.id)
-                }
-                className="px-5 py-3.5 flex items-center justify-between gap-3 cursor-pointer select-none bg-white hover:bg-slate-50/70 transition-colors"
+                onClick={() => setExpandedMain(isMainOpen ? null : main.key)}
+                className="px-5 py-4 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-50/70 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  {isExpanded ? (
+                  {isMainOpen ? (
                     <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
                   ) : (
                     <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                   )}
-
-                  <span
-                    className={`font-mono text-xs font-bold px-2 py-0.5 rounded border ${familyBadgeStyle}`}
-                  >
-                    {cat.code}
+                  <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded border ${getFamilyColor(main.key)}`}>
+                    {main.key}
                   </span>
-
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {cat.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1">
-                      {cat.operationalDefinition}
-                    </p>
-                  </div>
+                  <h3 className="text-base font-extrabold text-slate-900">{main.label}</h3>
                 </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {cat.isTransversal && (
-                    <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-purple-50 text-purple-700 border border-purple-200">
-                      Dimensión Transversal
-                    </span>
-                  )}
-                  <div className="flex items-center gap-1 text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200">
-                    <BookOpen className="w-3 h-3 text-slate-400" />
-                    <span>{cat.relatedIndicators.length} ind.</span>
-                  </div>
-                </div>
+                <span className="text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                  {rows.length} {rows.length === 1 ? 'pregunta' : 'preguntas'}
+                </span>
               </div>
 
-              {/* Accordion Expanded Body */}
-              {isExpanded && (
-                <div className="p-5 border-t border-slate-100 space-y-4 text-xs bg-slate-50/40">
-                  {/* Operational definition */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-                    <span className="font-bold text-indigo-700 block mb-1 text-[11px] uppercase tracking-wider">
-                      Definición Operacional Metodológica:
-                    </span>
-                    <p className="text-slate-800 leading-relaxed text-sm">
-                      {cat.operationalDefinition}
+              {isMainOpen && (
+                <div className="border-t border-slate-100 divide-y divide-slate-100">
+                  {rows.length === 0 && (
+                    <p className="px-5 py-4 text-xs text-slate-500">
+                      No hay preguntas de este formulario en esta categoría.
                     </p>
-                  </div>
-
-                  {/* Criteria split */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5">
-                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold mb-1 text-[11px] uppercase tracking-wider">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Criterios de Inclusión:</span>
-                      </div>
-                      <p className="text-slate-700 leading-relaxed">
-                        {cat.inclusionCriteria}
-                      </p>
-                    </div>
-
-                    <div className="bg-rose-50/50 border border-rose-200 rounded-xl p-3.5">
-                      <div className="flex items-center gap-1.5 text-rose-800 font-bold mb-1 text-[11px] uppercase tracking-wider">
-                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Criterios de Exclusión:</span>
-                      </div>
-                      <p className="text-slate-700 leading-relaxed">
-                        {cat.exclusionCriteria}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Related indicators & example */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-                      <span className="font-bold text-slate-800 block mb-2 text-[11px] uppercase tracking-wider">
-                        Indicadores e Instrumentos Relacionados:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {cat.relatedIndicators.map((ind) => (
-                          <span
-                            key={ind}
-                            className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
-                          >
-                            {ind}
+                  )}
+                  {rows.map((q) => {
+                    const cat = categories.find((c) => c.id === q.linkedCategories?.[0])!;
+                    const isSel = selectedQuestionId === q.id;
+                    return (
+                      <div key={q.id}>
+                        <div
+                          onClick={() => setSelectedQuestionId(isSel ? null : q.id)}
+                          className={`px-5 py-3 flex items-start gap-3 cursor-pointer text-xs transition-colors ${
+                            isSel ? 'bg-indigo-50/60' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                            {q.code}
                           </span>
-                        ))}
+                          <p className="text-slate-800 leading-relaxed">{q.prompt}</p>
+                        </div>
+                        {isSel && (
+                          <div className="px-5 pb-4 pt-1 bg-indigo-50/30 space-y-3">
+                            <div className="text-xs text-slate-700">
+                              Subcategoría:{' '}
+                              <span className="font-bold text-slate-900">{cat.name}</span>
+                            </div>
+                <div className="p-5 border-t border-slate-100 space-y-4 text-xs bg-slate-50/40">
+                        {/* Operational definition */}
+                        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+                          <span className="font-bold text-indigo-700 block mb-1 text-[11px] uppercase tracking-wider">
+                            Definición Operacional Metodológica:
+                          </span>
+                          <p className="text-slate-800 leading-relaxed text-sm">
+                            {cat.operationalDefinition}
+                          </p>
+                        </div>
+      
+                        {/* Criteria split */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5">
+                            <div className="flex items-center gap-1.5 text-emerald-800 font-bold mb-1 text-[11px] uppercase tracking-wider">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Criterios de Inclusión:</span>
+                            </div>
+                            <p className="text-slate-700 leading-relaxed">
+                              {cat.inclusionCriteria}
+                            </p>
+                          </div>
+      
+                          <div className="bg-rose-50/50 border border-rose-200 rounded-xl p-3.5">
+                            <div className="flex items-center gap-1.5 text-rose-800 font-bold mb-1 text-[11px] uppercase tracking-wider">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Criterios de Exclusión:</span>
+                            </div>
+                            <p className="text-slate-700 leading-relaxed">
+                              {cat.exclusionCriteria}
+                            </p>
+                          </div>
+                        </div>
+      
+                        {/* Related indicators & example */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+                            <span className="font-bold text-slate-800 block mb-2 text-[11px] uppercase tracking-wider">
+                              Indicadores e Instrumentos Relacionados:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {cat.relatedIndicators.map((ind) => (
+                                <span
+                                  key={ind}
+                                  className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                >
+                                  {ind}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+      
+                          <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+                            <span className="font-bold text-slate-800 block mb-1 text-[11px] uppercase tracking-wider">
+                              Ejemplo Ilustrativo de Evidencia (Ficticio):
+                            </span>
+                            <p className="text-slate-700 italic leading-relaxed">
+                              {cat.illustrativeExample}
+                            </p>
+                          </div>
+                        </div>
+      
+                        {/* Audit Trail & Actions */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3 text-slate-400" />
+                              <span>Autor: <strong>{cat.auditTrail.createdBy}</strong></span>
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span>
+                                Modificado: {cat.auditTrail.lastModifiedDate} (por{' '}
+                                {cat.auditTrail.lastModifiedBy})
+                              </span>
+                            </span>
+                          </div>
+      
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenEdit(cat)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold transition-colors"
+                            >
+                              <Edit3 className="w-3 h-3 text-indigo-600" />
+                              <span>Editar Categoría</span>
+                            </button>
+      
+                            <button
+                              onClick={() => handleDelete(cat)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-700 border border-slate-200 transition-colors"
+                              title="Retirar categoría"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
-                      <span className="font-bold text-slate-800 block mb-1 text-[11px] uppercase tracking-wider">
-                        Ejemplo Ilustrativo de Evidencia (Ficticio):
-                      </span>
-                      <p className="text-slate-700 italic leading-relaxed">
-                        {cat.illustrativeExample}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Audit Trail & Actions */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3 text-slate-400" />
-                        <span>Autor: <strong>{cat.auditTrail.createdBy}</strong></span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span>
-                          Modificado: {cat.auditTrail.lastModifiedDate} (por{' '}
-                          {cat.auditTrail.lastModifiedBy})
-                        </span>
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenEdit(cat)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold transition-colors"
-                      >
-                        <Edit3 className="w-3 h-3 text-indigo-600" />
-                        <span>Editar Categoría</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(cat)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-700 border border-slate-200 transition-colors"
-                        title="Retirar categoría"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

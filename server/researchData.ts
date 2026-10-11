@@ -31,6 +31,9 @@ function text(value: unknown, field: string, max: number, required = false): Val
   return { ok: true, value: normalized };
 }
 
+// audio/<id de usuario>/<uuid>.<ext>: la clave solo la genera el servidor.
+export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
+
 function questionKey(key: string, expectedPrefix: string): boolean {
   return key.length <= 20 && key.startsWith(expectedPrefix) && QUESTION_ID.test(key);
 }
@@ -107,7 +110,12 @@ function cleanInterviewRecords(value: unknown): ValidationResult<Record<string, 
   const records: Record<string, InterviewRecord> = {};
   for (const [key, raw] of Object.entries(value)) {
     if (!questionKey(key, 'E') || !isRecord(raw)) return { ok: false, error: 'Una respuesta de entrevista no es válida.' };
-    const response = text(raw.verbatimResponse, 'respuesta textual', 10000, true);
+    const audioKey = typeof raw.audioKey === 'string' ? raw.audioKey.trim() : '';
+    if (audioKey && !AUDIO_KEY.test(audioKey)) return { ok: false, error: 'La referencia del audio no es válida.' };
+    const audioMime = typeof raw.audioMime === 'string' && /^audio\/[a-z0-9.+-]{1,40}$/.test(raw.audioMime) ? raw.audioMime : undefined;
+    const audioSeconds = typeof raw.audioSeconds === 'number' && Number.isFinite(raw.audioSeconds) && raw.audioSeconds >= 0 && raw.audioSeconds <= 7200
+      ? Math.round(raw.audioSeconds) : undefined;
+    const response = text(raw.verbatimResponse, 'respuesta textual', 10000, !audioKey);
     const probing = text(raw.probingQuestions, 'preguntas de profundización', 4000);
     const notes = text(raw.contextualNotes, 'notas contextuales', 3000);
     if (!response.ok || !probing.ok || !notes.ok) {
@@ -118,7 +126,8 @@ function cleanInterviewRecords(value: unknown): ValidationResult<Record<string, 
       questionId: key,
       verbatimResponse: response.value,
       ...(probing.value ? { probingQuestions: probing.value } : {}),
-      contextualNotes: notes.value
+      contextualNotes: notes.value,
+      ...(audioKey ? { audioKey, ...(audioMime ? { audioMime } : {}), ...(audioSeconds !== undefined ? { audioSeconds } : {}) } : {})
     };
   }
   return { ok: true, value: records };
@@ -141,7 +150,7 @@ export function validateSessionDraft(input: unknown): ValidationResult<ResearchS
   }
   const institution = text(input.institution, 'institución', 160, true);
   const grade = text(input.grade, 'grado o grupo', 120, true);
-  const task = text(input.stiVersionOrTask, 'módulo o tarea', 240, true);
+  const task = text(input.stiVersionOrTask, 'módulo o tarea', 240);
   const notes = text(input.notes, 'notas', 2000);
   const audioRef = text(input.audioRecordingRef, 'referencia de grabación', 250);
   if (!institution.ok || !grade.ok || !task.ok || !notes.ok || !audioRef.ok) {

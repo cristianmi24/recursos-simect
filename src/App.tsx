@@ -17,7 +17,6 @@ import { CodingWorkspaceView } from './components/CodingWorkspace/CodingWorkspac
 import { TriangulationView } from './components/TriangulationModule/TriangulationView';
 import { ReportsView } from './components/ReportsModule/ReportsView';
 import { AuditExportView } from './components/AuditExportModule/AuditExportView';
-import { DeliverablesView } from './components/DeliverablesModule/DeliverablesView';
 import { TutorDataEntryFlow } from './components/DataEntryModule/TutorDataEntryFlow';
 import { UsersView } from './components/UsersModule/UsersView';
 import { LoadingScreen } from './components/LoadingScreen';
@@ -48,7 +47,6 @@ const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
   return (
     <main className="app-content flex-1 max-w-7xl w-full mx-auto px-4 py-8">
       {syncNotice}{limitNotice}
-      {activeTab === 'deliverables' && <DeliverablesView />}
       {activeTab === 'categories' && <CategoryMatrixView />}
       {activeTab === 'coding' && <CodingWorkspaceView />}
       {activeTab === 'triangulation' && <TriangulationView />}

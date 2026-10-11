@@ -5,7 +5,6 @@ import { SessionModal } from './SessionModal';
 import { SessionDetailModal } from './SessionDetailModal';
 import {
   ClipboardList,
-  Plus,
   Eye,
   Edit,
   Trash2,
@@ -50,12 +49,6 @@ export const InstrumentList: React.FC = () => {
   const obsCount = sessions.filter((s) => s.instrumentType === 'OBS').length;
   const gfCount = sessions.filter((s) => s.instrumentType === 'GF').length;
   const eCount = sessions.filter((s) => s.instrumentType === 'E').length;
-
-  const handleOpenNew = (type: InstrumentType) => {
-    setNewModalType(type);
-    setEditingSession(null);
-    setIsNewModalOpen(true);
-  };
 
   const handleEdit = (session: ResearchSession) => {
     setEditingSession(session);
@@ -109,33 +102,8 @@ export const InstrumentList: React.FC = () => {
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">
               Base de datos de sesiones de campo registradas en los 3 instrumentos: Observación (OBS1-8),
-              Grupo Focal (GF1-10) y Entrevistas (E1-5).
+              Entrevistas (E1-5) y Grupo Focal (GF1-10).
             </p>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => handleOpenNew('OBS')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nueva Observación</span>
-            </button>
-            <button
-              onClick={() => handleOpenNew('GF')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nuevo Grupo Focal</span>
-            </button>
-            <button
-              onClick={() => handleOpenNew('E')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nueva Entrevista</span>
-            </button>
           </div>
         </div>
 
@@ -156,25 +124,10 @@ export const InstrumentList: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
-                2. Grupo Focal
-              </span>
-              <div className="text-2xl font-black text-slate-900 mt-0.5">
-                {gfCount}{' '}
-                <span className="text-xs font-semibold text-slate-500">sesiones (GF1-10)</span>
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 font-black flex items-center justify-center text-xs">
-              GF
-            </div>
-          </div>
-
           <div className="bg-teal-50/50 border border-teal-200 rounded-xl p-3.5 flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">
-                3. Entrevista Semiestructurada
+                2. Entrevista Semiestructurada
               </span>
               <div className="text-2xl font-black text-slate-900 mt-0.5">
                 {eCount}{' '}
@@ -183,6 +136,21 @@ export const InstrumentList: React.FC = () => {
             </div>
             <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-800 font-black flex items-center justify-center text-xs">
               E
+            </div>
+          </div>
+
+          <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
+                3. Grupo Focal
+              </span>
+              <div className="text-2xl font-black text-slate-900 mt-0.5">
+                {gfCount}{' '}
+                <span className="text-xs font-semibold text-slate-500">sesiones (GF1-10)</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 font-black flex items-center justify-center text-xs">
+              GF
             </div>
           </div>
         </div>
@@ -204,7 +172,7 @@ export const InstrumentList: React.FC = () => {
 
           {/* Type filter */}
           <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
-            {(['ALL', 'OBS', 'GF', 'E'] as const).map((t) => (
+            {(['ALL', 'OBS', 'E', 'GF'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setFilterType(t)}
@@ -287,10 +255,11 @@ export const InstrumentList: React.FC = () => {
                   </span>
                 </div>
 
-                {/* STI Task Title */}
-                <h3 className="text-sm font-bold text-slate-900 mb-2 line-clamp-1">
-                  {session.stiVersionOrTask}
-                </h3>
+                {session.stiVersionOrTask && (
+                  <h3 className="text-sm font-bold text-slate-900 mb-2 line-clamp-1">
+                    {session.stiVersionOrTask}
+                  </h3>
+                )}
 
                 {/* Metadata Details */}
                 <div className="space-y-1.5 text-xs text-slate-600">
@@ -363,9 +332,6 @@ export const InstrumentList: React.FC = () => {
           <div className="col-span-full py-12 text-center text-slate-500 bg-white border border-slate-200 rounded-2xl shadow-xs">
             <ClipboardList className="w-8 h-8 mx-auto text-slate-400 mb-2" />
             <p className="text-sm font-semibold">No se encontraron sesiones con los filtros seleccionados.</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Haga clic en «Nueva Observación», «Nuevo Grupo Focal» o «Nueva Entrevista» para agregar un registro.
-            </p>
           </div>
         )}
       </div>

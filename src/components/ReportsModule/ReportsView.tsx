@@ -33,99 +33,73 @@ export const ReportsView: React.FC = () => {
       title: 'Reporte 1: Experiencias de los Estudiantes con el STI',
       familyKey: 'EXP',
       categoryCodes: [
-        'EXP-GEN',
-        'EXP-INT',
         'EXP-ANA',
         'EXP-ALT',
-        'EXP-DUDA',
         'EXP-PLAN',
         'EXP-MON',
         'EXP-AUT',
-        'EXP-RET'
+        'EXP-RET',
+        'EXP-INT',
+        'EXP-DUDA',
+        'EXP-RETAUT',
+        'EXP-GEN'
       ],
       description:
-        'Análisis cualitativo integral de las vivencias, dinámicas de interacción y conductas observables de los estudiantes durante su trabajo con el tutor inteligente.',
+        'Análisis cualitativo de las vivencias, conductas observables y estrategias de los estudiantes durante su trabajo con el tutor inteligente.',
       researchQuestion:
-        '¿Cómo describen y experimentan los estudiantes la interacción pedagógica con el Sistema Tutor Inteligente en sus dimensiones de análisis, planificación y autorregulación?'
+        '¿Cómo describen y experimentan los estudiantes la interacción pedagógica con el Sistema Tutor Inteligente en sus dimensiones de análisis, planificación, monitoreo y autorregulación?'
     },
     {
       id: 2,
       title: 'Reporte 2: Percepciones sobre el STI y su Mediación',
       familyKey: 'PER',
       categoryCodes: [
-        'PER-PC',
         'PER-APER',
+        'PER-PC',
+        'PER-PERSP',
         'PER-CONSC',
         'PER-META',
         'PER-ADAPT',
-        'PER-VAL',
         'PER-PROP'
       ],
       description:
-        'Evaluación subjetiva, juicios valorativos y apreciaciones de los estudiantes sobre la utilidad didáctica y el valor pedagógico del sistema.',
+        'Percepciones de los estudiantes sobre el aporte del STI al pensamiento crítico, la apertura a perspectivas, la metacognición, la adaptación y la valoración y mejora del sistema.',
       researchQuestion:
-        '¿Cuáles son las percepciones de los estudiantes respecto al aporte del STI en su proceso de aprendizaje y apertura conceptual?'
+        '¿Cuáles son las percepciones de los estudiantes respecto al aporte del STI en su proceso de aprendizaje, su pensamiento crítico y su metacognición?'
     },
     {
       id: 3,
       title: 'Reporte 3: Dificultades Experimentadas u Observadas',
       familyKey: 'DIF',
-      categoryCodes: [
-        'DIF-INT',
-        'DIF-COMP',
-        'DIF-RET',
-        'DIF-AJUSTE',
-        'DIF-FRUST',
-        'DIF-MEJORA'
-      ],
+      categoryCodes: ['DIF-AUT', 'DIF-INT'],
       description:
-        'Caracterización de las barreras operativas, de comprensión, frustraciones afectivas y dificultades de ajuste de estrategias identificadas en campo.',
+        'Caracterización de las dificultades de interacción y autonomía observadas y reportadas al usar la interfaz y desarrollar las actividades del STI.',
       researchQuestion:
-        '¿Qué obstáculos de navegación, conceptuales o emocionales experimentan los estudiantes al interactuar con el tutor?'
+        '¿Qué dificultades de interacción y autonomía experimentan los estudiantes al trabajar con el tutor inteligente?'
     },
     {
       id: 4,
-      title: 'Reporte 4: Evidencias de Pensamiento Crítico (PC)',
-      familyKey: 'PC',
-      categoryCodes: ['PC-ANALISIS', 'PC-EVAL', 'PC-APER', 'PC-CUEST'],
-      description:
-        'Análisis transversal sobre descomposición de premisas, evaluación deliberada de alternativas y cuestionamiento de certezas inducido por el STI.',
-      researchQuestion:
-        '¿En qué medida la mediación del tutor estimula el pensamiento crítico y la formulación de juicios razonados?'
-    },
-    {
-      id: 5,
-      title: 'Reporte 5: Evidencias de Metacognición y Autorregulación',
-      familyKey: 'META',
-      categoryCodes: ['META-PLAN', 'META-MON', 'META-REG'],
-      description:
-        'Examen de la toma de conciencia del propio aprendizaje, supervisión de avances y modificación voluntaria de estrategias tras errores.',
-      researchQuestion:
-        '¿Cómo actúa el STI como espejo cognitivo y andamio para la autorregulación metacognitiva?'
-    },
-    {
-      id: 6,
-      title: 'Reporte 6: Percepción de Adaptación del Tutor Inteligente',
+      title: 'Reporte 4: Percepción de Adaptación del Tutor Inteligente',
       familyKey: 'PER-ADAPT',
       categoryCodes: ['PER-ADAPT'],
       description:
-        'Indagación específica sobre si los estudiantes perciben una respuesta algorítmica personalizada o un flujo estandarizado idéntico para todos.',
+        'Indagación específica sobre si los estudiantes perciben una respuesta personalizada del tutor o un flujo estandarizado idéntico para todos.',
       researchQuestion:
         '¿De qué manera los estudiantes perciben la adaptatividad y personalización del tutor inteligente?'
     },
     {
-      id: 7,
-      title: 'Reporte 7: Propuestas de Mejora de los Estudiantes',
+      id: 5,
+      title: 'Reporte 5: Valoración y Propuestas de Mejora',
       familyKey: 'PER-PROP',
-      categoryCodes: ['PER-PROP', 'DIF-MEJORA'],
+      categoryCodes: ['PER-PROP'],
       description:
-        'Sistematización de recomendaciones didácticas y funcionales formuladas por los alumnos para optimizar el andamiaje del software.',
+        'Sistematización de las propuestas de cambio y valoraciones formuladas por los estudiantes para que el tutor ayude mejor a pensar.',
       researchQuestion:
-        '¿Qué sugerencias plantean los estudiantes para convertir al tutor en un compañero de aprendizaje más reflexivo y accesible?'
+        '¿Qué cambios plantean los estudiantes para convertir al tutor en un mejor compañero de estudio y de pensamiento?'
     },
     {
-      id: 8,
-      title: 'Reporte 8: Resultados de la Triangulación y Síntesis Global',
+      id: 6,
+      title: 'Reporte 6: Resultados de la Triangulación y Síntesis Global',
       familyKey: 'TRIANG',
       categoryCodes: [],
       description:
@@ -139,7 +113,7 @@ export const ReportsView: React.FC = () => {
 
   // Relevant fragments for current report
   const relevantFragments = codedFragments.filter((frag) => {
-    if (selectedReportId === 8) return true; // all fragments
+    if (selectedReportId === 6) return true; // all fragments
     return (
       frag.categoryIds.some((cid) => currentReport.categoryCodes.includes(cid)) ||
       (frag.transversalDimensionIds &&
@@ -149,7 +123,7 @@ export const ReportsView: React.FC = () => {
 
   // Relevant triangulations
   const relevantTriangulations = triangulationEntries.filter((tr) => {
-    if (selectedReportId === 8) return true;
+    if (selectedReportId === 6) return true;
     return (
       currentReport.categoryCodes.includes(tr.categoryId) ||
       (tr.transversalDimensionId && currentReport.categoryCodes.includes(tr.transversalDimensionId))
@@ -411,7 +385,7 @@ Verificadas empíricamente mediante triangulación de fuentes.`;
           <div className="space-y-3">
             <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-800 border-b border-slate-200 pb-1.5 flex items-center gap-2">
               <Bookmark className="w-4 h-4 text-indigo-600" />
-              <span>4. Contrastación Multifuente y Triangulación (OBS vs. GF vs. E)</span>
+              <span>4. Contrastación Multifuente y Triangulación (OBS vs. E vs. GF)</span>
             </h3>
 
             <div className="space-y-3">

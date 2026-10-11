@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,6 +24,7 @@ import type {
   ResearchSession,
   ResearchSessionDraft
 } from '../../types';
+import { AudioRecorder, StoredAudioPlayer } from './AudioRecorder';
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
 
 type WizardPhase = 'home' | 'form';
@@ -48,15 +49,6 @@ const instrumentCards: InstrumentCardInfo[] = [
     accent: 'indigo'
   },
   {
-    type: 'GF',
-    title: 'Grupo focal',
-    shortTitle: 'Grupo focal',
-    range: 'GF1–GF10',
-    count: 10,
-    description: 'Captura las intervenciones del grupo por pregunta y participante.',
-    accent: 'amber'
-  },
-  {
     type: 'E',
     title: 'Entrevista semiestructurada',
     shortTitle: 'Entrevista',
@@ -64,8 +56,21 @@ const instrumentCards: InstrumentCardInfo[] = [
     count: 5,
     description: 'Registra respuestas textuales y repreguntas de cada entrevista.',
     accent: 'teal'
+  },
+  {
+    type: 'GF',
+    title: 'Grupo focal',
+    shortTitle: 'Grupo focal',
+    range: 'GF1–GF10',
+    count: 10,
+    description: 'Captura las intervenciones del grupo por pregunta y participante.',
+    accent: 'amber'
   }
 ];
+
+type SimectUser = { institucion_codigo: string; institucion_nombre: string; usuario: string; nombres: string; apellidos: string };
+const fullName = (user: SimectUser) => `${user.nombres} ${user.apellidos}`.trim();
+const selectClass = 'min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900';
 
 function blankDraft(type: InstrumentType, questions: QuestionDefinition[]): ResearchSessionDraft {
   const date = new Date().toISOString().slice(0, 10);
@@ -143,6 +148,22 @@ export const TutorDataEntryFlow: React.FC = () => {
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>('OBS');
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<ResearchSessionDraft | null>(null);
+  const [simectUsers, setSimectUsers] = useState<SimectUser[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/simect/usuarios', { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
+      .then((data: SimectUser[]) => { if (active && Array.isArray(data)) setSimectUsers(data); })
+      .catch(() => { if (active) setSimectUsers([]); });
+    return () => { active = false; };
+  }, []);
+  const simectReady = (simectUsers?.length || 0) > 0;
+  const simectStatus = simectUsers === null ? 'Cargando instituciones y estudiantes de SIMECT…' : 'No se pudo cargar la lista de SIMECT. Recarga la página; sin ella no se puede elegir institución ni estudiante.';
+  const simectInstitutions = useMemo(
+    () => Array.from(new Set((simectUsers || []).map((user) => user.institucion_nombre))).sort((a, b) => a.localeCompare(b, 'es')),
+    [simectUsers]
+  );
   const [editingSession, setEditingSession] = useState<ResearchSession | null>(null);
   const [viewingSession, setViewingSession] = useState<ResearchSession | null>(null);
   const [filterType, setFilterType] = useState<InstrumentType | 'ALL'>('ALL');
@@ -336,14 +357,11 @@ export const TutorDataEntryFlow: React.FC = () => {
   const metadataSummary = draft ? [
     ['Fecha', draft.date],
     ['Institución', draft.institution],
-    ['Grado / grupo', draft.grade],
+    ['Grado', draft.grade],
     ['Número de sesión STI', String(draft.sessionNumber)],
     [selectedInstrument === 'GF' ? 'Seudónimos de participantes' : 'Seudónimo del estudiante', selectedInstrument === 'GF' ? (draft.participantPseudonyms?.join(', ') || 'Sin dato') : (draft.studentPseudonym || 'Sin dato')],
-    ['Módulo o tarea del STI', draft.stiVersionOrTask],
     ...(selectedInstrument === 'GF' ? [['Duración', `${draft.sessionDurationMinutes || 45} minutos`]] : []),
     ['Consentimiento verificado', draft.recordingConsentApproved ? 'Sí' : 'No'],
-    ['Referencia de grabación', draft.audioRecordingRef || 'No registrada'],
-    ['Notas generales', draft.notes || 'Sin notas']
   ] : [];
 
   const renderQuestionEditor = (question: QuestionDefinition) => {
@@ -356,27 +374,12 @@ export const TutorDataEntryFlow: React.FC = () => {
         observableEvidence: '',
         contextualNotes: ''
       };
-      const notObserved = record.observed === 'not_applicable';
       return (
         <div className="space-y-5">
           {question.description && <p className="text-sm leading-6 text-slate-600">{question.description}</p>}
           {question.methodologicalNote && <p className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-950"><strong>Guía metodológica:</strong> {question.methodologicalNote}</p>}
           {question.id === 'OBS8' && <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">Registra la reacción conductual predominante y susténtala con evidencia observable; evita inferir estados internos.</p>}
-          <label className="flex min-h-12 items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
-            <input type="checkbox" checked={notObserved} onChange={(event) => updateObservation(question.id, {
-              observed: event.target.checked ? 'not_applicable' : true,
-              ...(event.target.checked ? { scaleValue: '', observableEvidence: '' } : { notObservedReason: '' })
-            })} className="h-5 w-5 accent-amber-700" />
-            No observado / información insuficiente
-          </label>
-          {notObserved ? (
-            <div className="space-y-2">
-              <label htmlFor={`tutor-${question.id}-reason`} className="block text-sm font-semibold text-slate-800">Motivo de la no observación <span aria-hidden="true">*</span></label>
-              <textarea id={`tutor-${question.id}-reason`} required maxLength={1000} rows={4} value={record.notObservedReason || ''} onChange={(event) => updateObservation(question.id, { notObservedReason: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-indigo-600" placeholder="Explica brevemente por qué no fue posible observar este indicador." />
-              <p className="text-xs text-slate-500">La falta de observación no se interpreta como una respuesta negativa.</p>
-            </div>
-          ) : (
-            <>
+          <>
               <div className="space-y-2">
                 <label htmlFor={`tutor-${question.id}-scale`} className="block text-sm font-semibold text-slate-800">Respuesta registrada <span aria-hidden="true">*</span></label>
                 <select id={`tutor-${question.id}-scale`} required value={record.scaleValue || ''} onChange={(event) => updateObservation(question.id, { scaleValue: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-indigo-600">
@@ -388,12 +391,7 @@ export const TutorDataEntryFlow: React.FC = () => {
                 <label htmlFor={`tutor-${question.id}-evidence`} className="block text-sm font-semibold text-slate-800">Evidencia concreta observable <span aria-hidden="true">*</span></label>
                 <textarea id={`tutor-${question.id}-evidence`} required maxLength={8000} rows={5} value={record.observableEvidence || ''} onChange={(event) => updateObservation(question.id, { observableEvidence: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-indigo-600" placeholder="Describe acciones visibles, palabras, tiempos o movimientos. No incluyas nombres reales ni inferencias sobre pensamientos." />
               </div>
-              <div className="space-y-2">
-                <label htmlFor={`tutor-${question.id}-notes`} className="block text-sm font-semibold text-slate-800">Notas contextuales <span className="font-normal text-slate-500">(opcional)</span></label>
-                <textarea id={`tutor-${question.id}-notes`} maxLength={3000} rows={3} value={record.contextualNotes || ''} onChange={(event) => updateObservation(question.id, { contextualNotes: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-indigo-600" placeholder="Contexto que ayude a interpretar la observación." />
-              </div>
-            </>
-          )}
+          </>
         </div>
       );
     }
@@ -418,10 +416,6 @@ export const TutorDataEntryFlow: React.FC = () => {
                   <label htmlFor={`tutor-${question.id}-${turn.id}-text`} className="block text-sm font-semibold text-slate-800">Transcripción textual <span aria-hidden="true">*</span></label>
                   <textarea id={`tutor-${question.id}-${turn.id}-text`} required maxLength={8000} rows={4} value={turn.text} onChange={(event) => updateFocusTurn(question.id, turn.id, { text: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-amber-600" placeholder="Registra fielmente lo que expresó el participante." />
                 </div>
-                <div className="space-y-2">
-                  <label htmlFor={`tutor-${question.id}-${turn.id}-context`} className="block text-sm font-semibold text-slate-800">Notas contextuales <span className="font-normal text-slate-500">(opcional)</span></label>
-                  <input id={`tutor-${question.id}-${turn.id}-context`} maxLength={2000} value={turn.contextualNotes || ''} onChange={(event) => updateFocusTurn(question.id, turn.id, { contextualNotes: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-amber-600" placeholder="Tono, gestos o dinámica del grupo." />
-                </div>
               </fieldset>
             ))}
           </div>
@@ -438,17 +432,18 @@ export const TutorDataEntryFlow: React.FC = () => {
     return (
       <div className="space-y-5">
         {question.description && <p className="text-sm leading-6 text-slate-600">{question.description}</p>}
+        <AudioRecorder
+          value={{ audioKey: record.audioKey, audioMime: record.audioMime, audioSeconds: record.audioSeconds }}
+          consentApproved={draft.recordingConsentApproved}
+          onChange={(audio) => updateInterview(question.id, { audioKey: audio.audioKey, audioMime: audio.audioMime, audioSeconds: audio.audioSeconds })}
+        />
         <div className="space-y-2">
-          <label htmlFor={`tutor-${question.id}-response`} className="block text-sm font-semibold text-slate-800">Respuesta textual íntegra <span aria-hidden="true">*</span></label>
-          <textarea id={`tutor-${question.id}-response`} required maxLength={10000} rows={6} value={record.verbatimResponse} onChange={(event) => updateInterview(question.id, { verbatimResponse: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-teal-700" placeholder="Transcribe con fidelidad la respuesta del estudiante." />
+          <label htmlFor={`tutor-${question.id}-response`} className="block text-sm font-semibold text-slate-800">Transcripción de la respuesta {record.audioKey ? <span className="font-normal text-slate-500">(opcional con audio)</span> : <span aria-hidden="true">*</span>}</label>
+          <textarea id={`tutor-${question.id}-response`} required={!record.audioKey} maxLength={10000} rows={6} value={record.verbatimResponse} onChange={(event) => updateInterview(question.id, { verbatimResponse: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-teal-700" placeholder="Transcribe con fidelidad la respuesta del estudiante." />
         </div>
         <div className="space-y-2">
           <label htmlFor={`tutor-${question.id}-probing`} className="block text-sm font-semibold text-slate-800">Preguntas de profundización <span className="font-normal text-slate-500">(opcional)</span></label>
           <textarea id={`tutor-${question.id}-probing`} maxLength={4000} rows={3} value={record.probingQuestions || ''} onChange={(event) => updateInterview(question.id, { probingQuestions: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-teal-700" />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor={`tutor-${question.id}-context`} className="block text-sm font-semibold text-slate-800">Notas contextuales y paraverbales <span className="font-normal text-slate-500">(opcional)</span></label>
-          <textarea id={`tutor-${question.id}-context`} maxLength={3000} rows={3} value={record.contextualNotes || ''} onChange={(event) => updateInterview(question.id, { contextualNotes: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-900 focus:border-teal-700" />
         </div>
       </div>
     );
@@ -461,13 +456,13 @@ export const TutorDataEntryFlow: React.FC = () => {
       const record = draft.observationRecords?.[question.id];
       answer = record?.observed === 'not_applicable'
         ? <p><strong>No observado:</strong> {record.notObservedReason || 'Sin motivo registrado'}</p>
-        : <><p><strong>Respuesta:</strong> {record?.scaleValue || 'Sin dato'}</p><p className="mt-2"><strong>Evidencia:</strong> {record?.observableEvidence || 'Sin dato'}</p>{record?.contextualNotes && <p className="mt-2"><strong>Notas:</strong> {record.contextualNotes}</p>}</>;
+        : <><p><strong>Respuesta:</strong> {record?.scaleValue || 'Sin dato'}</p><p className="mt-2"><strong>Evidencia:</strong> {record?.observableEvidence || 'Sin dato'}</p></>;
     } else if (selectedInstrument === 'GF') {
       const record = draft.focusGroupRecords?.[question.id];
-      answer = <><ul className="space-y-3">{record?.turns.map((turn, index) => <li key={turn.id} className="rounded-lg bg-white p-3"><strong>Intervención {index + 1} · {turn.participantPseudonym || 'Sin seudónimo'}</strong><p className="mt-1 whitespace-pre-wrap">{turn.text || 'Sin transcripción'}</p>{turn.contextualNotes && <p className="mt-1"><strong>Contexto:</strong> {turn.contextualNotes}</p>}</li>)}</ul>{record?.moderatorNotes && <p className="mt-2"><strong>Notas del moderador:</strong> {record.moderatorNotes}</p>}</>;
+      answer = <><ul className="space-y-3">{record?.turns.map((turn, index) => <li key={turn.id} className="rounded-lg bg-white p-3"><strong>Intervención {index + 1} · {turn.participantPseudonym || 'Sin seudónimo'}</strong><p className="mt-1 whitespace-pre-wrap">{turn.text || 'Sin transcripción'}</p></li>)}</ul>{record?.moderatorNotes && <p className="mt-2"><strong>Notas del moderador:</strong> {record.moderatorNotes}</p>}</>;
     } else {
       const record = draft.interviewRecords?.[question.id];
-      answer = <><p className="whitespace-pre-wrap">{record?.verbatimResponse || 'Sin dato'}</p>{record?.probingQuestions && <p className="mt-2"><strong>Repreguntas:</strong> {record.probingQuestions}</p>}{record?.contextualNotes && <p className="mt-2"><strong>Contexto:</strong> {record.contextualNotes}</p>}</>;
+      answer = <>{record?.audioKey && <div className="mb-2"><StoredAudioPlayer audioKey={record.audioKey} /></div>}<p className="whitespace-pre-wrap">{record?.verbatimResponse || (record?.audioKey ? 'Sin transcripción (solo audio)' : 'Sin dato')}</p>{record?.probingQuestions && <p className="mt-2"><strong>Repreguntas:</strong> {record.probingQuestions}</p>}</>;
     }
     return (
       <section key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -515,7 +510,7 @@ export const TutorDataEntryFlow: React.FC = () => {
             <div><div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><ClipboardList size={15} aria-hidden="true" />{isAdmin ? 'Historial general' : 'Historial personal'}</div><h2 id="tutor-history-title" className="mt-1 text-xl font-extrabold text-slate-900">Formularios enviados</h2><p className="mt-1 text-sm text-slate-600">Puedes consultar y editar tus registros; los cambios quedarán registrados con la fecha de actualización.</p></div>
             <label className="flex min-h-12 items-center gap-2 text-sm font-semibold text-slate-700">Filtrar
               <select value={filterType} onChange={(event) => { setFilterType(event.target.value as InstrumentType | 'ALL'); setShowAllSessions(false); }} className="min-h-12 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900">
-                <option value="ALL">Todos</option><option value="OBS">OBS</option><option value="GF">GF</option><option value="E">E</option>
+                <option value="ALL">Todos</option><option value="OBS">OBS</option><option value="E">E</option><option value="GF">GF</option>
               </select>
             </label>
           </div>
@@ -579,16 +574,14 @@ export const TutorDataEntryFlow: React.FC = () => {
           <div><h2 className="text-lg font-extrabold text-slate-900">1. Datos generales</h2><p className="mt-1 text-sm text-slate-600">Completa la información de la sesión antes de registrar respuestas.</p></div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><label htmlFor="tutor-session-date" className="block text-sm font-semibold text-slate-800">Fecha de aplicación <span aria-hidden="true">*</span></label><input id="tutor-session-date" required type="date" value={draft.date} onChange={(event) => updateDraft({ date: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>
-            <div className="space-y-2"><label htmlFor="tutor-session-number" className="block text-sm font-semibold text-slate-800">Número de sesión STI <span aria-hidden="true">*</span></label><input id="tutor-session-number" required type="number" min="1" max="10000" value={draft.sessionNumber} onChange={(event) => updateDraft({ sessionNumber: Number(event.target.value) })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>
-            <div className="space-y-2"><label htmlFor="tutor-institution" className="block text-sm font-semibold text-slate-800">Institución educativa <span aria-hidden="true">*</span></label><input id="tutor-institution" required maxLength={160} value={draft.institution} onChange={(event) => updateDraft({ institution: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>
-            <div className="space-y-2"><label htmlFor="tutor-grade" className="block text-sm font-semibold text-slate-800">Grado / grupo <span aria-hidden="true">*</span></label><input id="tutor-grade" required maxLength={120} value={draft.grade} onChange={(event) => updateDraft({ grade: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>
+            <div className="space-y-2"><label htmlFor="tutor-session-number" className="block text-sm font-semibold text-slate-800">Número de sesión STI</label><select id="tutor-session-number" disabled value="1" className={selectClass}><option value="1">Sesión 1</option></select></div>
+            <div className="space-y-2"><label htmlFor="tutor-institution" className="block text-sm font-semibold text-slate-800">Institución educativa <span aria-hidden="true">*</span></label><select id="tutor-institution" required disabled={!simectReady} value={draft.institution} onChange={(event) => { updateDraft({ institution: event.target.value, studentPseudonym: '' }); updateParticipants(''); }} className={selectClass}><option value="" disabled>{simectReady ? 'Selecciona la institución' : simectStatus}</option>{draft.institution && !simectInstitutions.includes(draft.institution) && <option value={draft.institution}>{draft.institution}</option>}{simectInstitutions.map((name) => <option key={name} value={name}>{name}</option>)}</select></div>
+            <div className="space-y-2"><label htmlFor="tutor-grade" className="block text-sm font-semibold text-slate-800">Grado <span aria-hidden="true">*</span></label><select id="tutor-grade" required value={draft.grade} onChange={(event) => updateDraft({ grade: event.target.value })} className={selectClass}><option value="" disabled>Selecciona el grado</option>{draft.grade && !['Grado 8', 'Grado 9'].includes(draft.grade) && <option value={draft.grade}>{draft.grade}</option>}<option value="Grado 8">Grado 8</option><option value="Grado 9">Grado 9</option></select></div>
             {selectedInstrument === 'GF' ? <>
-              <div className="space-y-2"><label htmlFor="tutor-participants" className="block text-sm font-semibold text-slate-800">Seudónimos de participantes <span aria-hidden="true">*</span></label><input id="tutor-participants" required maxLength={2500} value={draft.participantPseudonyms?.join(', ') || ''} onChange={(event) => updateParticipants(event.target.value)} placeholder="EST-10B-01, EST-10B-02" className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /><span className="text-xs text-slate-500">Sepáralos con comas; usa solo seudónimos y registra hasta 30.</span></div>
+              <div className="space-y-2 sm:col-span-2"><label htmlFor="tutor-participants" className="block text-sm font-semibold text-slate-800">Estudiantes participantes <span aria-hidden="true">*</span></label>{draft.institution ? <fieldset id="tutor-participants" className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-slate-300 bg-white p-3">{(simectUsers || []).filter((user) => user.institucion_nombre === draft.institution).map((user) => { const checked = draft.participantPseudonyms?.includes(user.usuario) || false; return <label key={user.usuario} className="flex min-h-10 items-center gap-3 text-sm text-slate-800"><input type="checkbox" checked={checked} onChange={() => { const current = draft.participantPseudonyms || []; updateParticipants((checked ? current.filter((code) => code !== user.usuario) : [...current, user.usuario]).join(',')); }} className="h-4 w-4" /><span className="font-mono text-xs font-bold text-amber-800">{user.usuario}</span><span>{fullName(user)}</span></label>; })}</fieldset> : <p className="rounded-xl border border-dashed border-slate-300 p-3 text-xs text-slate-500">Primero selecciona la institución para ver sus estudiantes.</p>}<span className="text-xs text-slate-500">Marca a los estudiantes de la institución que participaron (máximo 30). Se guarda solo el código.</span></div>
               <div className="space-y-2"><label htmlFor="tutor-duration" className="block text-sm font-semibold text-slate-800">Duración aproximada (minutos)</label><input id="tutor-duration" type="number" min="1" max="1440" value={draft.sessionDurationMinutes ?? 45} onChange={(event) => updateDraft({ sessionDurationMinutes: event.target.value === '' ? undefined : Number(event.target.value) })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>
-            </> : <div className="space-y-2"><label htmlFor="tutor-student-pseudonym" className="block text-sm font-semibold text-slate-800">Seudónimo del estudiante <span aria-hidden="true">*</span></label><input id="tutor-student-pseudonym" required maxLength={80} value={draft.studentPseudonym || ''} onChange={(event) => updateDraft({ studentPseudonym: event.target.value })} placeholder="Ej.: EST-10B-04" className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>}
-            <div className="space-y-2 sm:col-span-2"><label htmlFor="tutor-sti-task" className="block text-sm font-semibold text-slate-800">Módulo o tarea del STI <span aria-hidden="true">*</span></label><input id="tutor-sti-task" required maxLength={240} value={draft.stiVersionOrTask} onChange={(event) => updateDraft({ stiVersionOrTask: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" /></div>
-            <div className="space-y-2 sm:col-span-2"><label htmlFor="tutor-audio-reference" className="block text-sm font-semibold text-slate-800">Referencia interna de grabación <span className="font-normal text-slate-500">(opcional, no adjuntes el archivo)</span></label><input id="tutor-audio-reference" maxLength={250} value={draft.audioRecordingRef || ''} onChange={(event) => updateDraft({ audioRecordingRef: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900" placeholder="Código de archivo autorizado" /></div>
-            <div className="space-y-2 sm:col-span-2"><label htmlFor="tutor-general-notes" className="block text-sm font-semibold text-slate-800">Notas generales <span className="font-normal text-slate-500">(opcional)</span></label><textarea id="tutor-general-notes" maxLength={2000} rows={3} value={draft.notes || ''} onChange={(event) => updateDraft({ notes: event.target.value })} className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900" /></div>
+            </> : <div className="space-y-2"><label htmlFor="tutor-student-pseudonym" className="block text-sm font-semibold text-slate-800">Estudiante <span aria-hidden="true">*</span></label><select id="tutor-student-pseudonym" required value={draft.studentPseudonym || ''} disabled={!draft.institution} onChange={(event) => updateDraft({ studentPseudonym: event.target.value })} className={selectClass}><option value="" disabled>{draft.institution ? 'Selecciona el estudiante' : 'Primero selecciona la institución'}</option>{draft.studentPseudonym && !(simectUsers || []).some((user) => user.usuario === draft.studentPseudonym && user.institucion_nombre === draft.institution) && <option value={draft.studentPseudonym}>{draft.studentPseudonym}</option>}{(simectUsers || []).filter((user) => user.institucion_nombre === draft.institution).map((user) => <option key={user.usuario} value={user.usuario}>{user.usuario} · {fullName(user)}</option>)}</select><span className="text-xs text-slate-500">Solo aparecen los estudiantes de la institución elegida. Se guarda solo el código.</span></div>}
+            
           </div>
           <label className="flex min-h-14 items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><input required type="checkbox" checked={draft.recordingConsentApproved} onChange={(event) => updateDraft({ recordingConsentApproved: event.target.checked })} className="mt-1 h-5 w-5 shrink-0 accent-amber-800" /><span><strong>Verifiqué el consentimiento y asentimiento informado.</strong> Confirmo que se cuenta con la autorización requerida para esta recolección de datos.</span></label>
         </section>}

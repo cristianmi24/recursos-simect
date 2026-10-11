@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useProject, type ActiveTab } from '../context/ProjectContext';
 import {
-  BookOpen,
   ChevronsLeft,
   ChevronsRight,
   ClipboardList,
@@ -47,10 +46,6 @@ export const AdminSidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => 
 
   const pending = codedFragments.filter((fragment) => fragment.status === 'propuesta_pendiente').length;
   const groups: { title: string; items: SidebarItem[] }[] = [
-    {
-      title: 'Documentación',
-      items: [{ id: 'deliverables', label: 'Entregables', hint: 'Dossier 1 al 8', tone: 'sage', icon: <BookOpen aria-hidden="true" />, badge: 8 }]
-    },
     {
       title: 'Análisis',
       items: [

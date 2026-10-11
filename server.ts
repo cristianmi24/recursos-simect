@@ -7,7 +7,9 @@ import rateLimit from 'express-rate-limit';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MAX_SESSION_BYTES, parseJsonObject, validateSessionDraft } from './server/researchData.js';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { AUDIO_KEY, MAX_SESSION_BYTES, parseJsonObject, validateSessionDraft } from './server/researchData.js';
 import type { AuditLogEntry, ManagedUser, ResearchSession } from './src/types';
 
 type Role = 'tutor' | 'admin';
@@ -230,6 +232,52 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, authConfigured: Boolean(sql) });
 });
 
+type SimectUser = { institucion_codigo: string; institucion_nombre: string; usuario: string; nombres: string; apellidos: string };
+let simectCache: { at: number; data: SimectUser[] } | null = null;
+const simectCacheMs = 5 * 60 * 1000;
+
+// Instituciones y estudiantes registrados en simect.me. La clave vive solo en el servidor
+// y el listado solo se entrega a usuarios con sesión iniciada.
+app.get('/api/simect/usuarios', async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const baseUrl = process.env.SIMECT_API_URL?.trim().replace(/\/$/, '');
+  const apiKey = process.env.SIMECT_API_KEY?.trim();
+  if (!baseUrl || !apiKey) {
+    res.status(503).json({ error: 'La integración con SIMECT no está configurada.' });
+    return;
+  }
+  if (simectCache && Date.now() - simectCache.at < simectCacheMs) {
+    res.json(simectCache.data);
+    return;
+  }
+  try {
+    const upstream = await fetch(`${baseUrl}/api/v1/integracion/usuarios`, {
+      headers: { 'X-API-Key': apiKey },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!upstream.ok) {
+      console.error('SIMECT respondió', upstream.status);
+      res.status(502).json({ error: 'SIMECT no respondió correctamente.' });
+      return;
+    }
+    const raw = await upstream.json();
+    if (!Array.isArray(raw)) throw new Error('Respuesta inesperada de SIMECT');
+    const data: SimectUser[] = raw.map((row) => ({
+      institucion_codigo: String(row.institucion_codigo ?? ''),
+      institucion_nombre: String(row.institucion_nombre ?? ''),
+      usuario: String(row.usuario ?? ''),
+      nombres: String(row.nombres ?? ''),
+      apellidos: String(row.apellidos ?? '')
+    })).filter((row) => row.usuario && row.institucion_nombre);
+    simectCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (error) {
+    console.error('No se pudo consultar SIMECT.', error instanceof Error ? error.message : 'Error desconocido');
+    res.status(502).json({ error: 'No se pudo consultar SIMECT en este momento.' });
+  }
+});
+
 app.get('/api/auth/session', async (req, res) => {
   if (!sql) {
     res.json({ user: null, configured: false });
@@ -302,6 +350,69 @@ app.post('/api/auth/logout', allowSameOrigin, async (req, res) => {
   }
 });
 
+// ---- Audio de entrevistas en Cloudflare R2 (compatible con S3) ----
+// El navegador sube el audio directo al bucket con una URL firmada de corta vida;
+// las credenciales viven solo en el servidor.
+const r2Bucket = process.env.R2_BUCKET?.trim();
+const r2Client = process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && r2Bucket
+  ? new S3Client({
+      region: 'auto',
+      endpoint: `https://${process.env.R2_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID.trim(), secretAccessKey: process.env.R2_SECRET_ACCESS_KEY.trim() }
+    })
+  : null;
+const audioExtensions: Record<string, string> = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a' };
+
+app.post('/api/audio/upload-url', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!r2Client || !r2Bucket) {
+    res.status(503).json({ error: 'El almacenamiento de audio no está configurado.' });
+    return;
+  }
+  const contentType = typeof req.body?.contentType === 'string' ? req.body.contentType.split(';')[0].trim().toLowerCase() : '';
+  const extension = audioExtensions[contentType];
+  if (!extension) {
+    res.status(400).json({ error: 'Formato de audio no admitido.' });
+    return;
+  }
+  try {
+    const key = `audio/${user.id}/${randomUUID()}.${extension}`;
+    const url = await getSignedUrl(r2Client, new PutObjectCommand({ Bucket: r2Bucket, Key: key, ContentType: contentType }), { expiresIn: 600 });
+    res.json({ key, url, contentType });
+  } catch (error) {
+    console.error('No se pudo firmar la subida de audio.', error instanceof Error ? error.message : 'Error desconocido');
+    res.status(503).json({ error: 'No se pudo preparar la subida del audio.' });
+  }
+});
+
+app.get('/api/audio/url', async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!r2Client || !r2Bucket) {
+    res.status(503).json({ error: 'El almacenamiento de audio no está configurado.' });
+    return;
+  }
+  const key = typeof req.query.key === 'string' ? req.query.key : '';
+  if (!AUDIO_KEY.test(key) || (user.role !== 'admin' && !key.startsWith(`audio/${user.id}/`))) {
+    res.status(403).json({ error: 'No tienes acceso a este audio.' });
+    return;
+  }
+  try {
+    const url = await getSignedUrl(r2Client, new GetObjectCommand({ Bucket: r2Bucket, Key: key }), { expiresIn: 300 });
+    res.json({ url });
+  } catch (error) {
+    console.error('No se pudo firmar la lectura de audio.', error instanceof Error ? error.message : 'Error desconocido');
+    res.status(503).json({ error: 'No se pudo cargar el audio.' });
+  }
+});
+
+// Un tutor solo puede adjuntar audios que subió él mismo.
+function foreignAudioKey(user: AuthUser, records: Record<string, { audioKey?: string }> | undefined): boolean {
+  if (user.role === 'admin' || !records) return false;
+  return Object.values(records).some((record) => record.audioKey && !record.audioKey.startsWith(`audio/${user.id}/`));
+}
+
 app.get('/api/sessions', async (req, res) => {
   const user = await requireUser(req, res);
   if (!user || !sql) return;
@@ -339,6 +450,10 @@ app.post('/api/sessions', writeLimiter, allowSameOrigin, async (req, res) => {
   const validation = validateSessionDraft(req.body);
   if (!validation.ok) {
     res.status(400).json({ error: validation.error });
+    return;
+  }
+  if (foreignAudioKey(user, validation.value.interviewRecords)) {
+    res.status(403).json({ error: 'El audio adjunto no pertenece a tu usuario.' });
     return;
   }
   const draft = validation.value;
@@ -402,6 +517,10 @@ app.put('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) => 
   const validation = validateSessionDraft(req.body);
   if (!validation.ok) {
     res.status(400).json({ error: validation.error });
+    return;
+  }
+  if (foreignAudioKey(user, validation.value.interviewRecords)) {
+    res.status(403).json({ error: 'El audio adjunto no pertenece a tu usuario.' });
     return;
   }
   try {

@@ -28,7 +28,7 @@ const roleChoices: { id: AuthRole; title: string; description: string; Icon: typ
   {
     id: 'admin',
     title: 'Administración',
-    description: 'Gestionar análisis y entregables',
+    description: 'Gestionar categorías y análisis',
     Icon: ShieldCheck
   }
 ];
@@ -74,7 +74,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
           <h1>Comprender el aprendizaje.<br /><em>Con rigor y humanidad.</em></h1>
           <p>Un espacio de trabajo para observar, escuchar y analizar experiencias con Sistemas Tutores Inteligentes.</p>
           <div className="auth-methods" aria-label="Instrumentos de investigación">
-            <span>Observación</span><b>·</b><span>Grupo focal</span><b>·</b><span>Entrevista</span>
+            <span>Observación</span><b>·</b><span>Entrevista</span><b>·</b><span>Grupo focal</span>
           </div>
         </div>
 

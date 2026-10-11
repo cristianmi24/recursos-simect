@@ -20,7 +20,6 @@ export type ActiveTab =
   | 'triangulation'
   | 'reports'
   | 'audit'
-  | 'deliverables'
   | 'users';
 
 export type AppMode = 'responder' | 'admin';
@@ -367,31 +366,31 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
     const matchedTransversals: string[] = [];
     let rationale = '';
     if (lower.includes('pensar') || lower.includes('razonar') || lower.includes('analizar') || lower.includes('premisa') || lower.includes('argument')) {
-      matchedCategories.push('EXP-ANA'); matchedTransversals.push('PC-ANALISIS');
+      matchedCategories.push('EXP-ANA', 'PER-PC');
       rationale += 'Detectada alusión a descomposición de información o razonamiento argumentativo. ';
     }
     if (lower.includes('duda') || lower.includes('insegur') || lower.includes('desconcert') || lower.includes('contraejemplo')) {
-      matchedCategories.push('EXP-DUDA'); matchedTransversals.push('PC-CUEST');
+      matchedCategories.push('EXP-DUDA');
       rationale += 'Señalamiento de suspensión de certeza o cuestionamiento ante contraejemplos. ';
     }
     if (lower.includes('alternativa') || lower.includes('opciones') || lower.includes('punto de vista') || lower.includes('perspectiva')) {
-      matchedCategories.push('EXP-ALT', 'PER-APER'); matchedTransversals.push('PC-APER');
+      matchedCategories.push('EXP-ALT', 'PER-PERSP');
       rationale += 'Referencia a múltiples alternativas y apertura a diferentes puntos de vista. ';
     }
     if (lower.includes('error') || lower.includes('correg') || lower.includes('revis') || lower.includes('releer') || lower.includes('estrategia')) {
-      matchedCategories.push('EXP-AUT'); matchedTransversals.push('META-REG');
+      matchedCategories.push('EXP-AUT', 'EXP-RETAUT');
       rationale += 'Indicios de autorregulación y ajuste cognitivo tras retroalimentación correctiva. ';
     }
     if (lower.includes('frustra') || lower.includes('rabia') || lower.includes('terco') || lower.includes('molest') || lower.includes('atrapad')) {
-      matchedCategories.push('DIF-FRUST');
+      matchedCategories.push('DIF-INT');
       rationale += 'Expresión afectiva de dificultad o fricción con la mediación del sistema. ';
     }
     if (lower.includes('cambiar') || lower.includes('agregar') || lower.includes('mejor') || lower.includes('propuesta') || lower.includes('entrenar')) {
-      matchedCategories.push('PER-PROP', 'DIF-MEJORA');
+      matchedCategories.push('PER-PROP');
       rationale += 'Propuesta explícita orientada a la optimización pedagógica o técnica del tutor. ';
     }
     if (lower.includes('consciente') || lower.includes('darme cuenta') || lower.includes('cómo aprendo') || lower.includes('mi mente')) {
-      matchedCategories.push('PER-CONSC', 'PER-META'); matchedTransversals.push('META-MON');
+      matchedCategories.push('PER-CONSC', 'PER-META');
       rationale += 'Autoinforme de toma de conciencia metacognitiva sobre el propio aprendizaje. ';
     }
     if (lower.includes('adapt') || lower.includes('igual a todos') || lower.includes('personaliz') || lower.includes('diferente')) {

@@ -16,6 +16,8 @@ interface SessionDetailModalProps {
   ) => void;
 }
 
+import { StoredAudioPlayer } from '../DataEntryModule/AudioRecorder';
+
 export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
   session,
   onClose,
@@ -343,12 +345,19 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
                       )}
                     </div>
 
+                    {rec.audioKey && (
+                      <div className="bg-teal-50/60 border border-teal-200 rounded-xl p-3.5 text-xs space-y-1.5">
+                        <span className="block text-teal-800 font-bold">Audio de la respuesta:</span>
+                        <StoredAudioPlayer audioKey={rec.audioKey} />
+                      </div>
+                    )}
+
                     <div className="bg-slate-50 border border-emerald-200 rounded-xl p-3.5 text-xs">
                       <span className="block text-emerald-800 font-bold mb-1">
                         Respuesta Textual (Transcripción Verbatim):
                       </span>
                       <p className="text-slate-800 leading-relaxed italic font-medium">
-                        "{rec.verbatimResponse || 'Sin transcripción registrada.'}"
+                        "{rec.verbatimResponse || (rec.audioKey ? 'Sin transcripción (solo audio).' : 'Sin transcripción registrada.')}"
                       </p>
                     </div>
 

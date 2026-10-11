@@ -56,7 +56,17 @@ app.disable('x-powered-by');
 const isVercel = Boolean(process.env.VERCEL);
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
 else if (isVercel) app.set('trust proxy', 1);
-app.use(helmet());
+// El navegador sube/lee audio directo en Cloudflare R2 (URLs firmadas) y reproduce la grabación local (blob:).
+const r2Origin = process.env.R2_ACCOUNT_ID?.trim() ? `https://${process.env.R2_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com` : null;
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'connect-src': ["'self'", ...(r2Origin ? [r2Origin] : [])],
+      'media-src': ["'self'", 'blob:', ...(r2Origin ? [r2Origin] : [])]
+    }
+  }
+}));
 app.use('/api', (_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();

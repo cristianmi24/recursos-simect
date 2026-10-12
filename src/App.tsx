@@ -24,6 +24,7 @@ import { UsersView } from './components/UsersModule/UsersView';
 import { LoadingScreen } from './components/LoadingScreen';
 import { TOP_LEVEL_ROUTES, currentSegments } from './utils/router';
 import { DialogProvider } from './components/DialogProvider';
+import { MobileQuickBar } from './components/MobileQuickBar';
 
 const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
   const { appMode, activeTab, dataStatus, dataError, persistenceError, sessionsTruncated, retryData } = useProject();
@@ -98,6 +99,7 @@ const Workspace: React.FC<{ user: AuthUser }> = ({ user }) => {
           </div>
         </div>
       </footer>
+      <MobileQuickBar role={user.role} />
     </div>
   );
 };

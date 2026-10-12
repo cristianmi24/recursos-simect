@@ -357,6 +357,25 @@ export const TutorDataEntryFlow: React.FC = () => {
     goToStep(Math.min(stepIndex + 1, reviewStepIndex));
   };
 
+  // Ctrl/⌘ + Enter: siguiente pregunta (o enviar en la revisión); con ⇧, pregunta anterior. Funciona mientras se escribe.
+  useEffect(() => {
+    if (phase !== 'form') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (stepIndex > 0) goToStep(stepIndex - 1);
+      } else if (stepIndex === reviewStepIndex) {
+        (document.getElementById('tutor-wizard-form') as HTMLFormElement | null)?.requestSubmit();
+      } else {
+        continueToNextStep();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
+
   const updateObservation = (questionId: string, patch: Partial<ObservationRecord>) => {
     setDraft((current) => {
       if (!current) return current;

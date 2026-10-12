@@ -29,6 +29,22 @@ import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
 import { navigate, useSegments } from '../../utils/router';
 import { useDialog } from '../DialogProvider';
 import { readStoredDraft, storeDraft } from '../../utils/draftStorage';
+import { AUDIO_CHANGED, AUDIO_UPLOADED, clearRecordings, listRecordings, processQueue, type AudioStatus, type UploadedAudio } from '../../utils/audioQueue';
+
+// Código con el que se nombra el audio del grupo focal (solo códigos SIMECT, nunca nombres).
+const groupAudioCode = (participants: string[] | undefined) => (participants?.length ? `grupo-${participants.join('-')}` : '');
+
+// Un grupo focal con audio no necesita intervenciones escritas: se descartan las que quedaron vacías.
+function draftForSubmit(draft: ResearchSessionDraft): ResearchSessionDraft {
+  if (!draft.focusGroupRecords) return draft;
+  return {
+    ...draft,
+    focusGroupRecords: Object.fromEntries(Object.entries(draft.focusGroupRecords).map(([questionId, record]) => [
+      questionId,
+      record.audioKey ? { ...record, turns: record.turns.filter((turn) => turn.text.trim()) } : record
+    ]))
+  };
+}
 
 type WizardPhase = 'home' | 'form';
 type InstrumentCardInfo = {
@@ -180,6 +196,8 @@ export const TutorDataEntryFlow: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  // Audios grabados en este formulario que aún no están en el almacenamiento (por pregunta).
+  const [pendingAudios, setPendingAudios] = useState<Record<string, AudioStatus>>({});
 
   const relevantQuestions = useMemo(
     () => questions.filter((question) => question.instrumentType === selectedInstrument),
@@ -219,16 +237,22 @@ export const TutorDataEntryFlow: React.FC = () => {
         if (blank(record?.scaleValue)) items.push({ step, label: `${question.code}: respuesta registrada` });
         if (blank(record?.observableEvidence)) items.push({ step, label: `${question.code}: evidencia observable` });
       } else if (selectedInstrument === 'GF') {
-        const turns = draft.focusGroupRecords?.[question.id]?.turns || [];
-        if (turns.length === 0 || turns.some((turn) => blank(turn.participantPseudonym))) items.push({ step, label: `${question.code}: seudónimo de cada intervención` });
-        if (turns.length === 0 || turns.some((turn) => blank(turn.text))) items.push({ step, label: `${question.code}: transcripción de cada intervención` });
+        const record = draft.focusGroupRecords?.[question.id];
+        // Con audio, solo cuentan las intervenciones que tienen texto.
+        const turns = (record?.turns || []).filter((turn) => !record?.audioKey || !blank(turn.text));
+        if (!record?.audioKey && turns.length === 0) items.push({ step, label: `${question.code}: audio o al menos una intervención` });
+        if (turns.some((turn) => blank(turn.participantPseudonym))) items.push({ step, label: `${question.code}: seudónimo de cada intervención` });
+        if (!record?.audioKey && turns.some((turn) => blank(turn.text))) items.push({ step, label: `${question.code}: transcripción de cada intervención` });
       } else {
         const record = draft.interviewRecords?.[question.id];
         if (!record?.audioKey && blank(record?.verbatimResponse)) items.push({ step, label: `${question.code}: audio o transcripción de la respuesta` });
       }
+      const audio = pendingAudios[question.id];
+      if (audio === 'queued') items.push({ step, label: `${question.code}: el audio aún se está enviando (espera la conexión)` });
+      else if (audio) items.push({ step, label: `${question.code}: hay un audio grabado sin guardar (acéptalo o descártalo)` });
     });
     return items;
-  }, [draft, relevantQuestions, selectedInstrument]);
+  }, [draft, relevantQuestions, selectedInstrument, pendingAudios]);
   const incompleteSteps = new Set(missingItems.map((item) => item.step));
 
   const goToStep = (step: number) => {
@@ -278,7 +302,10 @@ export const TutorDataEntryFlow: React.FC = () => {
   };
 
   const closeForm = () => {
-    if (formPathRef.current.length) storeDraft(formPathRef.current.join('/'), null);
+    if (formPathRef.current.length) {
+      storeDraft(formPathRef.current.join('/'), null);
+      void clearRecordings(`${formPathRef.current.join('/')}|`);
+    }
     formPathRef.current = [];
     setPhase('home');
     setDraft(null);
@@ -335,6 +362,41 @@ export const TutorDataEntryFlow: React.FC = () => {
   useEffect(() => {
     if (phase === 'form' && hasUnsavedChanges && draft && formPathRef.current.length) storeDraft(formPathRef.current.join('/'), draft);
   }, [draft, phase, hasUnsavedChanges]);
+
+  // Audios del formulario abierto: lista de pendientes, subida automática al volver la señal y,
+  // cuando un audio termina de subir, se enlaza a su pregunta aunque esa pregunta no esté abierta.
+  const formKey = phase === 'form' ? formPathRef.current.join('/') : '';
+  useEffect(() => {
+    if (!formKey) {
+      setPendingAudios({});
+      return;
+    }
+    const prefix = `${formKey}|`;
+    const refresh = () => {
+      void listRecordings(prefix).then((items) => setPendingAudios(Object.fromEntries(items.map((item) => [item.questionId, item.status]))));
+    };
+    const onUploaded = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; questionId: string; saved: UploadedAudio }>).detail;
+      if (!detail.id.startsWith(prefix)) return;
+      const audio = { ...detail.saved, transcribedAt: undefined };
+      if (detail.questionId.startsWith('GF')) updateFocusGroup(detail.questionId, audio);
+      else updateInterview(detail.questionId, audio);
+    };
+    const onOnline = () => { void processQueue(prefix); };
+    refresh();
+    void processQueue(prefix);
+    window.addEventListener(AUDIO_CHANGED, refresh);
+    window.addEventListener(AUDIO_UPLOADED, onUploaded);
+    window.addEventListener('online', onOnline);
+    const retry = window.setInterval(onOnline, 30000);
+    return () => {
+      window.clearInterval(retry);
+      window.removeEventListener(AUDIO_CHANGED, refresh);
+      window.removeEventListener(AUDIO_UPLOADED, onUploaded);
+      window.removeEventListener('online', onOnline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formKey]);
 
   const startNewForm = (type: InstrumentType) => navigate(['formularios', 'nuevo', type]);
 
@@ -439,7 +501,7 @@ export const TutorDataEntryFlow: React.FC = () => {
 
   const removeFocusTurn = (questionId: string, turnId: string) => {
     const record = draft?.focusGroupRecords?.[questionId];
-    if (!record || record.turns.length <= 1) return;
+    if (!record || (record.turns.length <= 1 && !record.audioKey)) return;
     updateFocusGroup(questionId, { turns: record.turns.filter((turn) => turn.id !== turnId) });
   };
 
@@ -455,8 +517,8 @@ export const TutorDataEntryFlow: React.FC = () => {
     setIsSaving(true);
     try {
       const saved = editingSession
-        ? await updateSession({ ...editingSession, ...draft, instrumentType: editingSession.instrumentType })
-        : await addSession(draft);
+        ? await updateSession({ ...editingSession, ...draftForSubmit(draft), instrumentType: editingSession.instrumentType })
+        : await addSession(draftForSubmit(draft));
       closeForm();
       navigate(['formularios']);
       setSuccessMessage(`${editingSession ? 'Se actualizaron tus respuestas' : 'Se envió el formulario'} (${saved.instrumentCode}).`);
@@ -522,6 +584,17 @@ export const TutorDataEntryFlow: React.FC = () => {
       return (
         <div className="space-y-5">
           {question.description && <p className="text-sm leading-6 text-slate-600">{question.description}</p>}
+          <AudioRecorder
+            label="Audio de la conversación (toda la pregunta)"
+            value={{ audioKey: record.audioKey, audioMime: record.audioMime, audioSeconds: record.audioSeconds }}
+            consentApproved={draft.recordingConsentApproved}
+            studentCode={groupAudioCode(draft.participantPseudonyms)}
+            missingCodeHint="Marca a los estudiantes participantes en los datos generales para poder grabar."
+            questionId={question.id}
+            storageId={`${formPathRef.current.join('/')}|${question.id}`}
+            onChange={(audio) => updateFocusGroup(question.id, { audioKey: audio.audioKey, audioMime: audio.audioMime, audioSeconds: audio.audioSeconds, audioTranscript: undefined, transcribedAt: undefined })}
+          />
+          <p className="text-xs leading-5 text-slate-500">{record.audioKey ? 'Con el audio guardado, las intervenciones escritas son opcionales: úsalas para anotar quién dijo qué.' : 'Graba la conversación o escribe las intervenciones (al menos una de las dos).'}</p>
           <div className="space-y-3">
             {record.turns.map((turn, index) => (
               <fieldset key={turn.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -531,7 +604,7 @@ export const TutorDataEntryFlow: React.FC = () => {
                     <label htmlFor={`tutor-${question.id}-${turn.id}-participant`} className="block text-sm font-semibold text-slate-800">Seudónimo <span aria-hidden="true">*</span></label>
                     <select id={`tutor-${question.id}-${turn.id}-participant`} required value={turn.participantPseudonym} onChange={(event) => updateFocusTurn(question.id, turn.id, { participantPseudonym: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-amber-600"><option value="" disabled>Selecciona un seudónimo</option>{draft.participantPseudonyms?.map((participant) => <option key={participant} value={participant}>{participant}</option>)}</select>
                   </div>
-                  {record.turns.length > 1 && <button type="button" onClick={() => removeFocusTurn(question.id, turn.id)} aria-label={`Quitar intervención ${index + 1}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-800"><Trash2 size={17} aria-hidden="true" />Quitar</button>}
+                  {(record.turns.length > 1 || record.audioKey) && <button type="button" onClick={() => removeFocusTurn(question.id, turn.id)} aria-label={`Quitar intervención ${index + 1}`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-800"><Trash2 size={17} aria-hidden="true" />Quitar</button>}
                 </div>
                 <div className="space-y-2">
                   <label htmlFor={`tutor-${question.id}-${turn.id}-text`} className="block text-sm font-semibold text-slate-800">Transcripción textual <span aria-hidden="true">*</span></label>
@@ -558,6 +631,7 @@ export const TutorDataEntryFlow: React.FC = () => {
           consentApproved={draft.recordingConsentApproved}
           studentCode={draft.studentPseudonym}
           questionId={question.id}
+          storageId={`${formPathRef.current.join('/')}|${question.id}`}
           onChange={(audio) => updateInterview(question.id, { audioKey: audio.audioKey, audioMime: audio.audioMime, audioSeconds: audio.audioSeconds })}
         />
         <div className="space-y-2">
@@ -578,7 +652,7 @@ export const TutorDataEntryFlow: React.FC = () => {
         : <><p><strong>Respuesta:</strong> {record?.scaleValue || 'Sin dato'}</p><p className="mt-2"><strong>Evidencia:</strong> {record?.observableEvidence || 'Sin dato'}</p></>;
     } else if (selectedInstrument === 'GF') {
       const record = draft.focusGroupRecords?.[question.id];
-      answer = <><ul className="space-y-3">{record?.turns.map((turn, index) => <li key={turn.id} className="rounded-lg bg-white p-3"><strong>Intervención {index + 1} · {turn.participantPseudonym || 'Sin seudónimo'}</strong><p className="mt-1 whitespace-pre-wrap">{turn.text || 'Sin transcripción'}</p></li>)}</ul>{record?.moderatorNotes && <p className="mt-2"><strong>Notas del moderador:</strong> {record.moderatorNotes}</p>}</>;
+      answer = <>{record?.audioKey && <div className="mb-3"><StoredAudioPlayer audioKey={record.audioKey} /></div>}<ul className="space-y-3">{record?.turns.map((turn, index) => <li key={turn.id} className="rounded-lg bg-white p-3"><strong>Intervención {index + 1} · {turn.participantPseudonym || 'Sin seudónimo'}</strong><p className="mt-1 whitespace-pre-wrap">{turn.text || 'Sin transcripción'}</p></li>)}</ul>{record?.moderatorNotes && <p className="mt-2"><strong>Notas del moderador:</strong> {record.moderatorNotes}</p>}</>;
     } else {
       const record = draft.interviewRecords?.[question.id];
       answer = <>{record?.audioKey && <div className="mb-2"><StoredAudioPlayer audioKey={record.audioKey} /></div>}<p className="whitespace-pre-wrap">{record?.verbatimResponse || (record?.audioKey ? 'Sin transcripción (solo audio)' : 'Sin dato')}</p></>;

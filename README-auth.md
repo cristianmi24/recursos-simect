@@ -31,6 +31,13 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 
 8. Para desarrollo con cuentas reales, coloca las variables correspondientes en un `.env` local excluido de Git. `npm run dev` inicia Vite en el puerto 3000 y la API Express en el 3001. Para producción, `npm run build` genera el frontend y `npm start` sirve la aplicación y la API desde Express.
 
+## Audios (entrevistas y grupos focales)
+
+- Cada pregunta de entrevista (E) y de grupo focal (GF) puede llevar un audio. En el grupo focal el audio es de toda la conversación de la pregunta; con audio, las intervenciones escritas son opcionales.
+- El audio se guarda primero en el dispositivo (IndexedDB) y luego se sube a Cloudflare R2. Mientras se graba se guarda cada 4 s, así que si la página se recarga o se cierra se recupera lo grabado. Una grabación sin aceptar también sobrevive a recargas y cambios de pregunta.
+- Al pulsar «Aceptar y guardar» sin conexión, el audio queda en cola en el dispositivo y se sube solo al volver la señal (también reintenta cada 30 s). El formulario no se puede enviar mientras haya un audio sin guardar o en cola.
+- Una vez subido y verificado (mismo tamaño en R2), el audio queda enlazado a la respuesta y se ve al recargar. Los audios en cola se borran del dispositivo al enviar o descartar el formulario y al cerrar sesión no se borran: se suben cuando se vuelve a abrir ese formulario.
+
 ## Protección y límites de los datos
 
 Escribe únicamente **seudónimos** en los campos destinados a participantes; no existe un campo seguro para nombres reales ni cifrado de nombres en esta aplicación. La seudonimización no elimina por sí sola el riesgo: una transcripción también puede identificar a una persona por su contenido. La casilla de consentimiento obliga a confirmar el paso en el formulario, pero no reemplaza el proceso ético ni constituye una verificación independiente del consentimiento.

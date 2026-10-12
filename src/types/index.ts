@@ -33,6 +33,11 @@ export interface FocusGroupRecord {
   questionId: string; // GF1 to GF10
   turns: FocusGroupTurn[];
   moderatorNotes: string;
+  audioKey?: string; // Audio de toda la conversación de esta pregunta (Cloudflare R2)
+  audioMime?: string;
+  audioSeconds?: number;
+  audioTranscript?: string; // Transcripción del audio hecha por el administrador con Qwen
+  transcribedAt?: string;
 }
 
 export interface InterviewRecord {

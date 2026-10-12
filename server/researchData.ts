@@ -32,7 +32,19 @@ function text(value: unknown, field: string, max: number, required = false): Val
 }
 
 // audio/<id de usuario>/<uuid>.<ext>: la clave solo la genera el servidor.
-export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/(?:[A-Za-z0-9-]{1,40}_E[1-9]_)?[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
+export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/(?:[A-Za-z0-9-]{1,40}_(?:E|GF)[1-9][0-9]?_)?[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
+
+// Campos de audio comunes a entrevista y grupo focal.
+function cleanAudio(raw: JsonRecord): ValidationResult<{ audioKey?: string; audioMime?: string; audioSeconds?: number; transcribedAt?: string }> {
+  const audioKey = typeof raw.audioKey === 'string' ? raw.audioKey.trim() : '';
+  if (!audioKey) return { ok: true, value: {} };
+  if (!AUDIO_KEY.test(audioKey)) return { ok: false, error: 'La referencia del audio no es válida.' };
+  const audioMime = typeof raw.audioMime === 'string' && /^audio\/[a-z0-9.+-]{1,40}$/.test(raw.audioMime) ? raw.audioMime : undefined;
+  const audioSeconds = typeof raw.audioSeconds === 'number' && Number.isFinite(raw.audioSeconds) && raw.audioSeconds >= 0 && raw.audioSeconds <= 900
+    ? Math.round(raw.audioSeconds) : undefined;
+  const transcribedAt = typeof raw.transcribedAt === 'string' && raw.transcribedAt.length <= 40 ? raw.transcribedAt : undefined;
+  return { ok: true, value: { audioKey, ...(audioMime ? { audioMime } : {}), ...(audioSeconds !== undefined ? { audioSeconds } : {}), ...(transcribedAt ? { transcribedAt } : {}) } };
+}
 
 function questionKey(key: string, expectedPrefix: string): boolean {
   return key.length <= 20 && key.startsWith(expectedPrefix) && QUESTION_ID.test(key);
@@ -76,11 +88,19 @@ function cleanFocusGroupRecords(value: unknown): ValidationResult<Record<string,
   }
   const records: Record<string, FocusGroupRecord> = {};
   for (const [key, raw] of Object.entries(value)) {
-    if (!questionKey(key, 'GF') || !isRecord(raw) || !Array.isArray(raw.turns) || raw.turns.length < 1 || raw.turns.length > 40) {
+    if (!questionKey(key, 'GF') || !isRecord(raw) || !Array.isArray(raw.turns) || raw.turns.length > 40) {
       return { ok: false, error: 'Una respuesta de grupo focal no es válida.' };
+    }
+    const audio = cleanAudio(raw);
+    if (!audio.ok) return audio;
+    // Con audio, las intervenciones escritas son opcionales (se pueden transcribir después).
+    if (raw.turns.length < 1 && !audio.value.audioKey) {
+      return { ok: false, error: `Graba el audio o registra al menos una intervención en ${key}.` };
     }
     const moderatorNotes = text(raw.moderatorNotes, 'notas de moderación', 4000);
     if (!moderatorNotes.ok) return moderatorNotes;
+    const transcript = text(raw.audioTranscript, 'transcripción del audio', 10000);
+    if (!transcript.ok) return transcript;
     const turns: FocusGroupTurn[] = [];
     for (const turn of raw.turns) {
       if (!isRecord(turn)) return { ok: false, error: 'Una intervención del grupo focal no es válida.' };
@@ -98,7 +118,10 @@ function cleanFocusGroupRecords(value: unknown): ValidationResult<Record<string,
         ...(notes.value ? { contextualNotes: notes.value } : {})
       });
     }
-    records[key] = { questionId: key, turns, moderatorNotes: moderatorNotes.value };
+    records[key] = {
+      questionId: key, turns, moderatorNotes: moderatorNotes.value, ...audio.value,
+      ...(audio.value.audioKey && transcript.value ? { audioTranscript: transcript.value } : {})
+    };
   }
   return { ok: true, value: records };
 }

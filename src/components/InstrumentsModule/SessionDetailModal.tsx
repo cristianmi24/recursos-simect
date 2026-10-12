@@ -251,6 +251,15 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
                       </div>
                     </div>
 
+                    {rec.audioKey && (
+                      <div className="space-y-1.5">
+                        <StoredAudioPlayer audioKey={rec.audioKey} />
+                        <p className="whitespace-pre-wrap text-xs text-slate-700">
+                          <strong>Transcripción del audio:</strong> {rec.audioTranscript || 'Sin transcripción todavía (Administración puede transcribirlo desde el Panel).'}
+                        </p>
+                      </div>
+                    )}
+
                     {rec.turns && rec.turns.length > 0 ? (
                       <div className="space-y-2">
                         {rec.turns.map((turn) => (

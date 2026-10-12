@@ -42,10 +42,18 @@ const formatDateTime = (iso: string) => {
   return formatDateTime12(date);
 };
 
+// Audios de entrevistas (uno por pregunta) y de grupos focales (uno por pregunta, de toda la conversación).
+const audioRecordsOf = (session: ResearchSession): [string, { audioKey?: string; audioMime?: string; transcribedAt?: string }][] =>
+  session.instrumentType === 'GF' ? Object.entries(session.focusGroupRecords || {}) : Object.entries(session.interviewRecords || {});
+
 const audioKeysOf = (session: ResearchSession) =>
-  Object.entries(session.interviewRecords || {})
+  audioRecordsOf(session)
     .filter(([, record]) => record.audioKey)
     .map(([questionId, record]) => ({ questionId, key: record.audioKey as string, mime: record.audioMime }));
+
+// Nombre con el que se guarda un audio al descargarlo: código del estudiante o del grupo focal.
+const audioOwnerOf = (session: ResearchSession) =>
+  session.instrumentType === 'GF' ? `grupo_${session.instrumentCode}` : session.studentPseudonym || 'sin_codigo';
 
 const participantsOf = (session: ResearchSession): string[] =>
   session.instrumentType === 'GF' ? session.participantPseudonyms || [] : session.studentPseudonym ? [session.studentPseudonym] : [];
@@ -78,6 +86,10 @@ function sessionToText(session: ResearchSession, questions: QuestionDefinition[]
     for (const id of ordered(Object.keys(session.focusGroupRecords || {}))) {
       const record = session.focusGroupRecords![id];
       lines.push(`${id}. ${promptOf(id)}`);
+      if (record.audioKey) {
+        lines.push('  Audio de la conversación: disponible (descargar desde el panel)');
+        lines.push(`  Transcripción del audio: ${record.audioTranscript || 'Sin transcripción'}`);
+      }
       record.turns.forEach((turn, index) => lines.push(`  ${index + 1}. ${turn.participantPseudonym || 'Sin código'}: ${turn.text || 'Sin transcripción'}`));
       if (record.moderatorNotes) lines.push(`  Notas del moderador: ${record.moderatorNotes}`);
       lines.push('');
@@ -215,7 +227,7 @@ export const DashboardView: React.FC = () => {
     try {
       for (const audio of audios) {
         const extension = audio.key.split('.').pop() || 'webm';
-        const name = `${session.studentPseudonym || session.instrumentCode}_${audio.questionId}.${extension}`;
+        const name = `${audioOwnerOf(session)}_${audio.questionId}.${extension}`;
         const response = await fetch(`/api/audio/url?key=${encodeURIComponent(audio.key)}&download=1&name=${encodeURIComponent(name)}`, { credentials: 'same-origin' });
         if (!response.ok) throw new Error('audio');
         const { url } = (await response.json()) as { url: string };
@@ -281,11 +293,11 @@ export const DashboardView: React.FC = () => {
         const file = await fetch(url);
         if (!file.ok) throw new Error('file');
         const extension = audio.key.split('.').pop() || 'webm';
-        const code = session.studentPseudonym || 'sin_codigo';
+        const code = audioOwnerOf(session);
         const category = categoryOf(audio.questionId);
         const folder = options.layout === 'category'
           ? `${safeName(category?.family || 'Sin categoría')}/${safeName(category?.name || 'Sin subcategoría')}`
-          : `${safeName(session.institution)}/${safeName(code)}`;
+          : `${safeName(session.institution)}/${session.instrumentType === 'GF' ? 'grupos_focales' : safeName(code)}`;
         files[`${folder}/${safeName(code)}_${audio.questionId}.${extension}`] = new Uint8Array(await file.arrayBuffer());
       }
       setZipProgress('Comprimiendo…');
@@ -342,9 +354,9 @@ export const DashboardView: React.FC = () => {
 
   const pendingAudios = (list: ResearchSession[]) =>
     list
-      .filter((session) => session.instrumentType === 'E')
+      .filter((session) => session.instrumentType === 'E' || session.instrumentType === 'GF')
       .flatMap((session) =>
-        Object.entries(session.interviewRecords || {})
+        audioRecordsOf(session)
           .filter(([, record]) => record.audioKey && !record.transcribedAt)
           .map(([questionId]) => ({ session, questionId }))
       );
@@ -657,6 +669,23 @@ export const DashboardView: React.FC = () => {
                       return (
                         <div key={question.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
                           {header}
+                          {record.audioKey && (
+                            <div className="space-y-2">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-teal-800"><Headphones className="h-3.5 w-3.5" aria-hidden="true" /> Audio de la conversación</span>
+                              <StoredAudioPlayer audioKey={record.audioKey} />
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Transcripción del audio</span>
+                                  {record.transcribedAt && (
+                                    <button type="button" onClick={() => void startTranscription(openStudent, [{ sessionId: session.id, questionId: question.id, force: true }])} disabled={Boolean(transcribing) || serverBusy} className="text-[11px] font-bold text-teal-800 underline hover:text-teal-900 disabled:cursor-not-allowed disabled:opacity-50">Volver a transcribir</button>
+                                  )}
+                                </div>
+                                {record.audioTranscript?.trim()
+                                  ? <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{record.audioTranscript}</p>
+                                  : <p className="text-sm font-semibold text-amber-800">Aún sin transcripción: usa «Transcribir audios» arriba.</p>}
+                              </div>
+                            </div>
+                          )}
                           <ul className="space-y-2">
                             {record.turns.map((turn, index) => (
                               <li key={turn.id} className={`rounded-lg border p-3 text-sm ${turn.participantPseudonym === code ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'}`}>

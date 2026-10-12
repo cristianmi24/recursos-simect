@@ -43,6 +43,7 @@ export interface InterviewRecord {
   audioKey?: string; // Clave del audio en el bucket de Cloudflare R2
   audioMime?: string;
   audioSeconds?: number;
+  transcribedAt?: string; // Momento en que el administrador transcribió el audio con Qwen
 }
 
 export interface ResearchSession {

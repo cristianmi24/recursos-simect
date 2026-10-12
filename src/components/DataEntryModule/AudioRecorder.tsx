@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Mic, RotateCcw, Square, Trash2 } from 'lucide-react';
 
-const MAX_SECONDS = 600;
+const MAX_SECONDS = 900;
 
 type RecorderValue = { audioKey?: string; audioMime?: string; audioSeconds?: number };
 
@@ -36,9 +36,11 @@ type Props = {
   onChange: (value: RecorderValue) => void;
   consentApproved: boolean;
   label?: string;
+  studentCode?: string;
+  questionId?: string;
 };
 
-export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApproved, label = 'Respuesta en audio' }) => {
+export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApproved, label = 'Respuesta en audio', studentCode, questionId }) => {
   const [status, setStatus] = useState<'idle' | 'recording' | 'uploading'>('idle');
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState('');
@@ -74,7 +76,7 @@ export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApprove
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentType: pending.mime })
+        body: JSON.stringify({ contentType: pending.mime, studentCode, questionId })
       });
       const payload = await signed.json().catch(() => ({}));
       if (!signed.ok) throw new Error(payload.error || 'No se pudo preparar la subida.');
@@ -161,11 +163,12 @@ export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApprove
         {status === 'recording' && <span className="flex items-center gap-2 font-mono text-sm font-bold text-rose-700"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-600" aria-hidden="true" />{formatTime(seconds)} / {formatTime(MAX_SECONDS)}</span>}
       </div>
 
+      {consentApproved && !studentCode && <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">Selecciona al estudiante en los datos generales para poder grabar: el audio se guarda con su código.</p>}
       {!consentApproved && <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">Para grabar, confirma primero el consentimiento en los datos generales.</p>}
 
       <div className="flex flex-wrap items-center gap-2">
         {status !== 'recording' && !hasAudio && !pending && (
-          <button type="button" onClick={() => void start()} disabled={!consentApproved || status === 'uploading'} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={() => void start()} disabled={!consentApproved || !studentCode || status === 'uploading'} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
             <Mic size={16} aria-hidden="true" /> Grabar audio
           </button>
         )}

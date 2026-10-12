@@ -17,6 +17,7 @@ import { CodingWorkspaceView } from './components/CodingWorkspace/CodingWorkspac
 import { TriangulationView } from './components/TriangulationModule/TriangulationView';
 import { ReportsView } from './components/ReportsModule/ReportsView';
 import { AuditExportView } from './components/AuditExportModule/AuditExportView';
+import { AudiosView } from './components/AudiosModule/AudiosView';
 import { DashboardView } from './components/DashboardModule/DashboardView';
 import { TutorDataEntryFlow } from './components/DataEntryModule/TutorDataEntryFlow';
 import { UsersView } from './components/UsersModule/UsersView';
@@ -49,6 +50,7 @@ const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
     <main className="app-content flex-1 max-w-7xl w-full mx-auto px-4 py-8">
       {syncNotice}{limitNotice}
       {activeTab === 'dashboard' && <DashboardView />}
+      {activeTab === 'audios' && <AudiosView />}
       {activeTab === 'categories' && <CategoryMatrixView />}
       {activeTab === 'coding' && <CodingWorkspaceView />}
       {activeTab === 'triangulation' && <TriangulationView />}

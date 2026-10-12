@@ -11,9 +11,10 @@ import {
   X
 } from 'lucide-react';
 
-const SHORTCUT_TABS: ActiveTab[] = ['dashboard', 'categories', 'coding', 'triangulation', 'reports', 'intake', 'audit', 'users'];
+const SHORTCUT_TABS: ActiveTab[] = ['dashboard', 'audios', 'categories', 'coding', 'triangulation', 'reports', 'intake', 'audit', 'users'];
 const BREADCRUMB_LABELS: Record<ActiveTab, string> = {
   dashboard: 'Panel',
+  audios: 'Audios',
   categories: 'Categorías',
   coding: 'Codificación',
   triangulation: 'Triangulación',

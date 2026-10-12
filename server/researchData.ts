@@ -32,7 +32,7 @@ function text(value: unknown, field: string, max: number, required = false): Val
 }
 
 // audio/<id de usuario>/<uuid>.<ext>: la clave solo la genera el servidor.
-export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
+export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/(?:[A-Za-z0-9-]{1,40}_E[1-9]_)?[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
 
 function questionKey(key: string, expectedPrefix: string): boolean {
   return key.length <= 20 && key.startsWith(expectedPrefix) && QUESTION_ID.test(key);
@@ -113,8 +113,9 @@ function cleanInterviewRecords(value: unknown): ValidationResult<Record<string, 
     const audioKey = typeof raw.audioKey === 'string' ? raw.audioKey.trim() : '';
     if (audioKey && !AUDIO_KEY.test(audioKey)) return { ok: false, error: 'La referencia del audio no es válida.' };
     const audioMime = typeof raw.audioMime === 'string' && /^audio\/[a-z0-9.+-]{1,40}$/.test(raw.audioMime) ? raw.audioMime : undefined;
-    const audioSeconds = typeof raw.audioSeconds === 'number' && Number.isFinite(raw.audioSeconds) && raw.audioSeconds >= 0 && raw.audioSeconds <= 7200
+    const audioSeconds = typeof raw.audioSeconds === 'number' && Number.isFinite(raw.audioSeconds) && raw.audioSeconds >= 0 && raw.audioSeconds <= 900
       ? Math.round(raw.audioSeconds) : undefined;
+    const transcribedAt = audioKey && typeof raw.transcribedAt === 'string' && raw.transcribedAt.length <= 40 ? raw.transcribedAt : undefined;
     const response = text(raw.verbatimResponse, 'respuesta textual', 10000, !audioKey);
     const probing = text(raw.probingQuestions, 'preguntas de profundización', 4000);
     const notes = text(raw.contextualNotes, 'notas contextuales', 3000);
@@ -127,7 +128,7 @@ function cleanInterviewRecords(value: unknown): ValidationResult<Record<string, 
       verbatimResponse: response.value,
       ...(probing.value ? { probingQuestions: probing.value } : {}),
       contextualNotes: notes.value,
-      ...(audioKey ? { audioKey, ...(audioMime ? { audioMime } : {}), ...(audioSeconds !== undefined ? { audioSeconds } : {}) } : {})
+      ...(audioKey ? { audioKey, ...(audioMime ? { audioMime } : {}), ...(audioSeconds !== undefined ? { audioSeconds } : {}), ...(transcribedAt ? { transcribedAt } : {}) } : {})
     };
   }
   return { ok: true, value: records };

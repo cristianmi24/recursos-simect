@@ -3,15 +3,19 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Archive,
+  Tag,
   Download,
   Eye,
   FileText,
   FolderOpen,
   GraduationCap,
   Headphones,
+  Languages,
   Search,
   Users
 } from 'lucide-react';
+import { zipSync } from 'fflate';
 import { useProject } from '../../context/ProjectContext';
 import type { InstrumentType, QuestionDefinition, ResearchSession } from '../../types';
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
@@ -96,10 +100,14 @@ function saveBlob(content: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const FAMILY_LABEL: Record<string, string> = { EXP: 'Experiencias', PER: 'Percepciones', DIF: 'Dificultades' };
+
+const safeName = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'sin_nombre';
+
 const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export const DashboardView: React.FC = () => {
-  const { sessions, questions } = useProject();
+  const { sessions, questions, categories, retryData } = useProject();
   const [simectUsers, setSimectUsers] = useState<SimectUser[]>([]);
   const [search, setSearch] = useState('');
   const [openInstitution, setOpenInstitution] = useState<string | null>(null);
@@ -107,6 +115,11 @@ export const DashboardView: React.FC = () => {
   const [viewing, setViewing] = useState<ResearchSession | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
+  const [zipProgress, setZipProgress] = useState('');
+  const [serverBusy, setServerBusy] = useState(false);
+  const [transcribing, setTranscribing] = useState('');
+  const [transcribeProgress, setTranscribeProgress] = useState('');
+  const [transcribeMessage, setTranscribeMessage] = useState<{ tone: 'error' | 'ok'; text: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -189,7 +202,7 @@ export const DashboardView: React.FC = () => {
     try {
       for (const audio of audios) {
         const extension = audio.key.split('.').pop() || 'webm';
-        const name = `${session.instrumentCode}_${audio.questionId}.${extension}`;
+        const name = `${session.studentPseudonym || session.instrumentCode}_${audio.questionId}.${extension}`;
         const response = await fetch(`/api/audio/url?key=${encodeURIComponent(audio.key)}&download=1&name=${encodeURIComponent(name)}`, { credentials: 'same-origin' });
         if (!response.ok) throw new Error('audio');
         const { url } = (await response.json()) as { url: string };
@@ -205,6 +218,165 @@ export const DashboardView: React.FC = () => {
       setMessage('No se pudo descargar uno de los audios. Inténtalo de nuevo.');
     } finally {
       setBusy('');
+    }
+  };
+
+  // Reúne los audios en un ZIP organizado por institución / estudiante, directo desde el navegador.
+  // Cada pregunta (E1…E5) pertenece a una subcategoría y, por ella, a una categoría principal.
+  const categoryOf = (questionId: string) => {
+    const question = questions.find((item) => item.id === questionId);
+    const category = categories.find((item) => item.id === question?.linkedCategories?.[0]);
+    return category ? { id: category.id, name: category.name, family: FAMILY_LABEL[category.family] || category.family } : null;
+  };
+
+  const audiosByCategory = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; family: string; questions: Set<string>; count: number }>();
+    for (const session of sessions) {
+      for (const audio of audioKeysOf(session)) {
+        const category = categoryOf(audio.questionId);
+        if (!category) continue;
+        const entry = map.get(category.id) || { ...category, questions: new Set<string>(), count: 0 };
+        entry.questions.add(audio.questionId);
+        entry.count += 1;
+        map.set(category.id, entry);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.family.localeCompare(b.family, 'es') || a.name.localeCompare(b.name, 'es'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, questions, categories]);
+
+  const downloadZip = async (list: ResearchSession[], zipName: string, options: { layout?: 'institution' | 'category'; categoryId?: string } = {}) => {
+    const items = list.flatMap((session) =>
+      audioKeysOf(session)
+        .filter((audio) => !options.categoryId || categoryOf(audio.questionId)?.id === options.categoryId)
+        .map((audio) => ({ session, audio }))
+    );
+    if (items.length === 0) {
+      setMessage('No hay audios para descargar.');
+      return;
+    }
+    setBusy('zip');
+    setMessage('');
+    const files: Record<string, Uint8Array> = {};
+    try {
+      for (let index = 0; index < items.length; index += 1) {
+        const { session, audio } = items[index];
+        setZipProgress(`Reuniendo audios… ${index + 1} de ${items.length}`);
+        const signed = await fetch(`/api/audio/url?key=${encodeURIComponent(audio.key)}`, { credentials: 'same-origin' });
+        if (!signed.ok) throw new Error('url');
+        const { url } = (await signed.json()) as { url: string };
+        const file = await fetch(url);
+        if (!file.ok) throw new Error('file');
+        const extension = audio.key.split('.').pop() || 'webm';
+        const code = session.studentPseudonym || 'sin_codigo';
+        const category = categoryOf(audio.questionId);
+        const folder = options.layout === 'category'
+          ? `${safeName(category?.family || 'Sin categoría')}/${safeName(category?.name || 'Sin subcategoría')}`
+          : `${safeName(session.institution)}/${safeName(code)}`;
+        files[`${folder}/${safeName(code)}_${audio.questionId}.${extension}`] = new Uint8Array(await file.arrayBuffer());
+      }
+      setZipProgress('Comprimiendo…');
+      await pause(50);
+      const zipped = zipSync(files, { level: 0 });
+      const blob = new Blob([zipped], { type: 'application/zip' });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = href;
+      anchor.download = `${zipName}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(href), 5000);
+    } catch {
+      setMessage('No se pudo armar el ZIP de audios. Inténtalo de nuevo.');
+    } finally {
+      setBusy('');
+      setZipProgress('');
+    }
+  };
+
+  // Si otra transcripción está en curso (de cualquier administrador), se bloquea hasta que termine.
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    const check = async () => {
+      try {
+        const response = await fetch('/api/admin/transcriptions/status', { credentials: 'same-origin' });
+        if (!response.ok) return;
+        const data = (await response.json()) as { busy: boolean };
+        if (!active) return;
+        const wasBusy = serverBusy;
+        setServerBusy(Boolean(data.busy));
+        if (data.busy) timer = window.setTimeout(check, 8000);
+        else if (wasBusy) retryData();
+      } catch {
+        /* sin conexión: se reintenta al volver a abrir el panel */
+      }
+    };
+    void check();
+    return () => { active = false; if (timer) window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pendingAudios = (list: ResearchSession[]) =>
+    list
+      .filter((session) => session.instrumentType === 'E')
+      .flatMap((session) =>
+        Object.entries(session.interviewRecords || {})
+          .filter(([, record]) => record.audioKey && !record.transcribedAt)
+          .map(([questionId]) => ({ session, questionId }))
+      );
+
+  const transcribeStudent = async (studentKey: string, list: ResearchSession[]) => {
+    const jobs = pendingAudios(list);
+    if (jobs.length === 0 || transcribing) return;
+    setTranscribing(studentKey);
+    setTranscribeMessage(null);
+    let done = 0;
+    try {
+      for (const [index, job] of jobs.entries()) {
+        setTranscribeProgress(`Transcribiendo ${index + 1} de ${jobs.length}… puede tardar unos minutos por audio.`);
+        const started = await fetch('/api/admin/transcriptions/start', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: job.session.id, questionId: job.questionId })
+        });
+        const startData = await started.json().catch(() => ({}));
+        if (!started.ok) {
+          setTranscribeMessage({ tone: 'error', text: startData.error || 'No se pudo iniciar la transcripción.' });
+          if (startData.code === 'busy') setServerBusy(true);
+          return;
+        }
+        if (startData.state !== 'done') {
+          let finished = false;
+          for (let attempt = 0; attempt < 270 && !finished; attempt += 1) {
+            await pause(5000);
+            const poll = await fetch(`/api/admin/transcriptions/${job.session.id}/${job.questionId}`, { credentials: 'same-origin' });
+            const pollData = await poll.json().catch(() => ({}));
+            if (pollData.state === 'done') finished = true;
+            else if (pollData.state === 'failed') {
+              setTranscribeMessage({ tone: 'error', text: pollData.message || 'No se pudo transcribir el audio.' });
+              return;
+            } else if (pollData.state === 'idle') {
+              setTranscribeMessage({ tone: 'error', text: 'La transcripción se interrumpió. Inténtalo de nuevo.' });
+              return;
+            }
+          }
+          if (!finished) {
+            setTranscribeMessage({ tone: 'error', text: 'La transcripción tardó demasiado. Inténtalo de nuevo más tarde.' });
+            return;
+          }
+        }
+        done += 1;
+      }
+      setTranscribeMessage({ tone: 'ok', text: `Listo: ${done} ${done === 1 ? 'audio transcrito' : 'audios transcritos'} y guardado${done === 1 ? '' : 's'} en la base de datos.` });
+    } catch {
+      setTranscribeMessage({ tone: 'error', text: 'Se perdió la conexión durante la transcripción. Revisa y vuelve a intentarlo.' });
+    } finally {
+      setTranscribing('');
+      setTranscribeProgress('');
+      retryData();
     }
   };
 
@@ -237,6 +409,44 @@ export const DashboardView: React.FC = () => {
         ))}
       </section>
 
+      {audiosByCategory.length > 0 && (
+        <section aria-label="Audios por categoría" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-900"><Tag className="h-4 w-4 text-teal-700" aria-hidden="true" /> Audios por categoría</h2>
+              <p className="text-xs text-slate-500">Cada pregunta de la entrevista pertenece a una subcategoría y a una categoría principal. Descarga los audios de una categoría o todos organizados por categoría.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void downloadZip(sessions, `audios_por_categoria_${new Date().toISOString().slice(0, 10)}`, { layout: 'category' })}
+              disabled={busy === 'zip'}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Todos, organizados por categoría (ZIP)
+            </button>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {audiosByCategory.map((category) => (
+              <article key={category.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{category.family}</span>
+                  <h3 className="text-sm font-extrabold text-slate-900">{category.name}</h3>
+                  <p className="mt-1 text-xs text-slate-600">{Array.from(category.questions).sort().join(', ')} · {category.count} {category.count === 1 ? 'audio' : 'audios'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void downloadZip(sessions, `audios_${safeName(category.name)}`, { layout: 'category', categoryId: category.id })}
+                  disabled={busy === 'zip'}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" /> Descargar categoría (ZIP)
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" aria-hidden="true" />
         <input
@@ -247,6 +457,29 @@ export const DashboardView: React.FC = () => {
           className="min-h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-600"
         />
       </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void downloadZip(sessions, `audios_simect_${new Date().toISOString().slice(0, 10)}`)}
+          disabled={busy === 'zip' || stats.audios === 0}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Archive className="h-4 w-4" aria-hidden="true" /> Descargar todos los audios (ZIP)
+        </button>
+        {zipProgress && <span role="status" className="text-sm font-semibold text-slate-700">{zipProgress}</span>}
+        {stats.audios === 0 && <span className="text-xs text-slate-500">Aún no hay audios guardados.</span>}
+      </div>
+
+      {serverBusy && !transcribing && (
+        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
+          Hay otra transcripción en curso. Espera a que termine para iniciar una nueva; este panel se actualizará solo.
+        </p>
+      )}
+      {transcribeProgress && <p role="status" className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-900">{transcribeProgress}</p>}
+      {transcribeMessage && (
+        <p role={transcribeMessage.tone === 'error' ? 'alert' : 'status'} className={`rounded-xl border px-4 py-3 text-sm font-semibold ${transcribeMessage.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>{transcribeMessage.text}</p>
+      )}
 
       {message && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{message}</p>}
 
@@ -287,6 +520,16 @@ export const DashboardView: React.FC = () => {
 
               {isOpen && (
                 <div className="divide-y divide-slate-100 border-t border-slate-100">
+                  <div className="flex justify-end bg-slate-50/60 px-5 py-2">
+                    <button
+                      type="button"
+                      onClick={() => void downloadZip(institution.sessions, `audios_${safeName(institution.name)}`)}
+                      disabled={busy === 'zip' || institution.sessions.every((session) => audioKeysOf(session).length === 0)}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Audios de esta institución (ZIP)
+                    </button>
+                  </div>
                   {studentEntries.length === 0 && <p className="px-5 py-4 text-sm text-slate-500">Sin estudiantes registrados.</p>}
                   {studentEntries.map(([code, list]) => {
                     const studentKey = `${institution.name}|${code}`;
@@ -318,7 +561,12 @@ export const DashboardView: React.FC = () => {
 
                         {isStudentOpen && (
                           <div className="space-y-2 bg-slate-50/60 px-5 py-4">
-                            <div className="flex justify-end">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {pendingAudios(list).length > 0 && (
+                                <button type="button" onClick={() => void transcribeStudent(studentKey, list)} disabled={Boolean(transcribing) || serverBusy} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
+                                  <Languages className="h-3.5 w-3.5" aria-hidden="true" /> {transcribing === studentKey ? 'Transcribiendo…' : `Transcribir audios (${pendingAudios(list).length})`}
+                                </button>
+                              )}
                               <button type="button" onClick={() => downloadStudentText(institution.name, code, list)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
                                 <Download className="h-3.5 w-3.5" aria-hidden="true" /> Descargar todos los textos del estudiante
                               </button>
@@ -340,8 +588,23 @@ export const DashboardView: React.FC = () => {
                                         <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" aria-hidden="true" /> Tutor: <strong className="text-slate-800">{session.researcherName}</strong></span>
                                         <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> {formatDateTime(session.createdAt)}</span>
                                         {session.instrumentType === 'GF' && <span>{participantsOf(session).length} participantes</span>}
+                                        {audios.length > 0 && Object.values(session.interviewRecords || {}).every((record) => !record.audioKey || record.transcribedAt) && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-bold text-emerald-800">Transcrito</span>}
                                         {audios.length > 0 && <span className="inline-flex items-center gap-1"><Headphones className="h-3.5 w-3.5" aria-hidden="true" /> {audios.length} {audios.length === 1 ? 'audio' : 'audios'}</span>}
                                       </div>
+                                      {audios.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 pt-1">
+                                          {audios.map((audio) => {
+                                            const category = categoryOf(audio.questionId);
+                                            return (
+                                              <span key={audio.questionId} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700">
+                                                <Headphones className="h-3 w-3" aria-hidden="true" />
+                                                <strong>{audio.questionId}</strong>
+                                                {category ? <>· {category.name} <span className="text-slate-400">({category.family})</span></> : null}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
                                     </div>
                                     <div className="flex shrink-0 flex-wrap gap-2">
                                       <button type="button" onClick={() => setViewing(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">

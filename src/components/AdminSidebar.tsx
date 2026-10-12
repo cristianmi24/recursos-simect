@@ -8,6 +8,7 @@ import {
   FolderTree,
   GitCompare,
   LayoutDashboard,
+  MessagesSquare,
   ShieldCheck,
   Tag,
   Users,
@@ -49,7 +50,9 @@ export const AdminSidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => 
   const groups: { title: string; items: SidebarItem[] }[] = [
     {
       title: 'Panel',
-      items: [{ id: 'dashboard', label: 'Panel', hint: 'Formularios por institución', tone: 'sage', icon: <LayoutDashboard aria-hidden="true" />, badge: sessions.length }]
+      items: [
+        { id: 'dashboard', label: 'Panel', hint: 'Formularios por institución', tone: 'sage', icon: <LayoutDashboard aria-hidden="true" />, badge: sessions.length },
+        { id: 'audios', label: 'Audios', hint: 'Chat con las transcripciones', tone: 'teal', icon: <MessagesSquare aria-hidden="true" /> }]
     },
     {
       title: 'Análisis',

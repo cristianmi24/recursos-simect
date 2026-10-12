@@ -148,6 +148,7 @@ export const TutorDataEntryFlow: React.FC = () => {
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>('OBS');
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<ResearchSessionDraft | null>(null);
+  const [showRecordingNotice, setShowRecordingNotice] = useState(false);
   const [simectUsers, setSimectUsers] = useState<SimectUser[] | null>(null);
 
   useEffect(() => {
@@ -435,6 +436,8 @@ export const TutorDataEntryFlow: React.FC = () => {
         <AudioRecorder
           value={{ audioKey: record.audioKey, audioMime: record.audioMime, audioSeconds: record.audioSeconds }}
           consentApproved={draft.recordingConsentApproved}
+          studentCode={draft.studentPseudonym}
+          questionId={question.id}
           onChange={(audio) => updateInterview(question.id, { audioKey: audio.audioKey, audioMime: audio.audioMime, audioSeconds: audio.audioSeconds })}
         />
         <div className="space-y-2">
@@ -579,7 +582,7 @@ export const TutorDataEntryFlow: React.FC = () => {
             </> : <div className="space-y-2"><label htmlFor="tutor-student-pseudonym" className="block text-sm font-semibold text-slate-800">Estudiante <span aria-hidden="true">*</span></label><select id="tutor-student-pseudonym" required value={draft.studentPseudonym || ''} disabled={!draft.institution} onChange={(event) => updateDraft({ studentPseudonym: event.target.value })} className={selectClass}><option value="" disabled>{draft.institution ? 'Selecciona el estudiante' : 'Primero selecciona la institución'}</option>{draft.studentPseudonym && !(simectUsers || []).some((user) => user.usuario === draft.studentPseudonym && user.institucion_nombre === draft.institution) && <option value={draft.studentPseudonym}>{draft.studentPseudonym}</option>}{(simectUsers || []).filter((user) => user.institucion_nombre === draft.institution).map((user) => <option key={user.usuario} value={user.usuario}>{user.usuario} · {fullName(user)}</option>)}</select><span className="text-xs text-slate-500">Solo aparecen los estudiantes de la institución elegida. Se guarda solo el código.</span></div>}
             
           </div>
-          <label className="flex min-h-14 items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><input required type="checkbox" checked={draft.recordingConsentApproved} onChange={(event) => updateDraft({ recordingConsentApproved: event.target.checked })} className="mt-1 h-5 w-5 shrink-0 accent-amber-800" /><span><strong>Verifiqué el consentimiento y asentimiento informado.</strong> Confirmo que se cuenta con la autorización requerida para esta recolección de datos.</span></label>
+          <label className="flex min-h-14 items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><input required type="checkbox" checked={draft.recordingConsentApproved} onChange={(event) => { if (event.target.checked) setShowRecordingNotice(true); else updateDraft({ recordingConsentApproved: false }); }} className="mt-1 h-5 w-5 shrink-0 accent-amber-800" /><span><strong>Verifiqué el consentimiento y asentimiento informado.</strong> Confirmo que se cuenta con la autorización requerida para esta recolección de datos.</span></label>
         </section>}
 
         {activeQuestion && <section className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -604,6 +607,32 @@ export const TutorDataEntryFlow: React.FC = () => {
             : <button type="button" onClick={(event) => { event.preventDefault(); continueToNextStep(); }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 text-sm font-extrabold text-white hover:bg-emerald-900">{stepIndex === 0 ? 'Continuar' : stepIndex === reviewStepIndex - 1 ? 'Revisar formulario' : 'Siguiente pregunta'}<ArrowRight size={17} aria-hidden="true" /></button>}
         </div>
       </form>
+      {showRecordingNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="recording-notice-title">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800"><ShieldCheck size={22} aria-hidden="true" /></span>
+              <h2 id="recording-notice-title" className="text-lg font-extrabold text-slate-900">Antes de empezar: avisa al estudiante</h2>
+            </div>
+            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+              <p><strong>Explícale al estudiante, con palabras sencillas, que su voz será grabada</strong> durante la entrevista y para qué se usará la grabación en esta investigación.</p>
+              <p>Cuéntale que la grabación se maneja con medidas de seguridad:</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>El audio se guarda en un almacenamiento privado y cifrado, sin enlaces públicos.</li>
+                <li>Solo pueden escucharlo el tutor que hizo la entrevista y el equipo investigador autorizado.</li>
+                <li>El estudiante se identifica solo con un código, no con su nombre, en los registros de la investigación.</li>
+              </ul>
+              <p><strong>Transcripción con inteligencia artificial:</strong> para convertir el audio en texto pueden usarse transcriptores de voz con IA. Se usan <strong>sin datos personales</strong>: no se envían nombres ni documentos del estudiante, solo el audio asociado a un código.</p>
+              <p>Si el estudiante no quiere ser grabado, respeta su decisión y no uses el grabador.</p>
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setShowRecordingNotice(false)} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={() => { updateDraft({ recordingConsentApproved: true }); setShowRecordingNotice(false); }} className="min-h-12 rounded-xl bg-amber-700 px-4 text-sm font-bold text-white hover:bg-amber-800">Ya se lo expliqué al estudiante</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -15,6 +15,7 @@ import { INITIAL_CATEGORIES } from '../data/initialCategories';
 
 export type ActiveTab =
   | 'dashboard'
+  | 'audios'
   | 'intake'
   | 'categories'
   | 'coding'

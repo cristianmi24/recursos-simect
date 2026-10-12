@@ -438,6 +438,8 @@ app.get('/api/audio/url', async (req, res) => {
 const qwenKey = process.env.QWEN_API_KEY?.trim();
 const qwenBase = (process.env.QWEN_API_BASE_URL?.trim() || 'https://dashscope-intl.aliyuncs.com/api/v1').replace(/\/$/, '');
 const qwenModel = process.env.QWEN_ASR_MODEL?.trim() || 'qwen3-asr-flash-filetrans';
+// Las entrevistas son en español: se fuerza el idioma para evitar transcripciones en chino o portugués.
+const qwenLanguage = process.env.QWEN_ASR_LANGUAGE?.trim() || 'es';
 const TASK_ID = /^[0-9a-fA-F-]{36}$/;
 const TEMP_KEY = /^tmp\/[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
 const SESSION_ID = /^[0-9a-fA-F-]{36}$/;
@@ -533,7 +535,7 @@ async function advanceTranscription(sessionId: string, questionId: string): Prom
   const text = (result.transcripts || []).map((item) => item.text || '').filter(Boolean).join('\n').trim().slice(0, 10000);
   const existing = typeof record.verbatimResponse === 'string' ? record.verbatimResponse.trim() : '';
   const { transcription: _removed, ...rest } = record;
-  const updated = { ...rest, transcribedAt: new Date().toISOString(), verbatimResponse: text ? (existing ? `${existing}\n\n${text}` : text).slice(0, 10000) : existing };
+  const updated = { ...rest, transcribedAt: new Date().toISOString(), verbatimResponse: text ? (existing && job.replace !== true ? `${existing}\n\n${text}` : text).slice(0, 10000) : (job.replace === true ? '' : existing) };
   await sql`
     UPDATE research_sessions SET payload = jsonb_set(payload, ARRAY['interviewRecords', ${questionId}::text], ${JSON.stringify(updated)}::jsonb), updated_at = NOW()
     WHERE id = ${sessionId}::uuid
@@ -568,12 +570,13 @@ app.post('/api/admin/transcriptions/start', writeLimiter, allowSameOrigin, async
       res.status(404).json({ error: 'Esta respuesta no tiene audio.' });
       return;
     }
-    if (loaded.record.transcribedAt) {
+    const force = req.body?.force === true;
+    if (loaded.record.transcribedAt && !force) {
       res.json({ state: 'done' });
       return;
     }
     const since = new Date(Date.now() - jobMaxMinutes * 60 * 1000).toISOString();
-    const marker = { status: 'processing', startedAt: new Date().toISOString() };
+    const marker = { status: 'processing', startedAt: new Date().toISOString(), ...(force ? { replace: true } : {}) };
     // Reserva atómica: solo una transcripción a la vez en todo el sistema.
     const rows = await sql`
       UPDATE research_sessions SET payload = jsonb_set(payload, ARRAY['interviewRecords', ${questionId}::text, 'transcription'], ${JSON.stringify(marker)}::jsonb, true)
@@ -595,7 +598,7 @@ app.post('/api/admin/transcriptions/start', writeLimiter, allowSameOrigin, async
     const upstream = await fetch(`${qwenBase}/services/audio/asr/transcription`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${qwenKey}`, 'Content-Type': 'application/json', 'X-DashScope-Async': 'enable' },
-      body: JSON.stringify({ model: qwenModel, input: { file_url: fileUrl }, parameters: { enable_words: false } }),
+      body: JSON.stringify({ model: qwenModel, input: { file_url: fileUrl }, parameters: { enable_words: false, language: qwenLanguage } }),
       signal: AbortSignal.timeout(15000)
     });
     const data = await upstream.json().catch(() => ({})) as { output?: { task_id?: string } };

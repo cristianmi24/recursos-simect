@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Headphones,
   Languages,
+  ArrowLeft,
   Search,
   Users
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { zipSync } from 'fflate';
 import { useProject } from '../../context/ProjectContext';
 import type { InstrumentType, QuestionDefinition, ResearchSession } from '../../types';
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
+import { StoredAudioPlayer } from '../DataEntryModule/AudioRecorder';
 
 type SimectUser = { institucion_nombre: string; usuario: string; nombres: string; apellidos: string };
 
@@ -125,6 +127,8 @@ export const DashboardView: React.FC = () => {
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
+
+  useEffect(() => { window.scrollTo({ top: 0 }); }, [openInstitution, openStudent]);
 
   const nameOf = (institution: string, code: string) => {
     const user = simectUsers.find((item) => item.usuario === code && item.institucion_nombre === institution)
@@ -323,6 +327,8 @@ export const DashboardView: React.FC = () => {
         </p>
       </header>
 
+      {!openInstitution && (
+        <>
       <section aria-label="Resumen" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {statCards.map((card) => (
           <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -394,6 +400,9 @@ export const DashboardView: React.FC = () => {
         {stats.audios === 0 && <span className="text-xs text-slate-500">Aún no hay audios guardados.</span>}
       </div>
 
+        </>
+      )}
+
       {serverBusy && !transcribing && (
         <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950">
           Hay otra transcripción en curso. Espera a que termine para iniciar una nueva; este panel se actualizará solo.
@@ -406,156 +415,247 @@ export const DashboardView: React.FC = () => {
 
       {message && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{message}</p>}
 
-      {institutions.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Todavía no hay formularios que mostrar.</p>
+      {/* ---------- Página 1: carpetas por institución ---------- */}
+      {!openInstitution && (
+        <>
+          {institutions.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Todavía no hay formularios que mostrar.</p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {institutions.map((institution) => {
+              const tutors = new Set(institution.sessions.map((s) => s.researcherName));
+              return (
+                <button
+                  key={institution.name}
+                  type="button"
+                  onClick={() => { setOpenInstitution(institution.name); setOpenStudent(null); }}
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
+                >
+                  <span className="flex items-center gap-3">
+                    <FolderOpen className="h-7 w-7 shrink-0 text-amber-600" aria-hidden="true" />
+                    <span className="text-base font-extrabold leading-snug text-slate-900">{institution.name}</span>
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {institution.sessions.length} formularios · {institution.students.size} estudiantes · {tutors.size} {tutors.size === 1 ? 'tutor' : 'tutores'}
+                    <br />Último registro {formatDateTime(institution.latest)}
+                  </span>
+                  <span className="flex flex-wrap gap-1.5">
+                    {TYPE_ORDER.map((type) => (
+                      <span key={type} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${TYPE_STYLE[type]}`}>{type} {institution.sessions.filter((s) => s.instrumentType === type).length}</span>
+                    ))}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      <div className="space-y-3">
-        {institutions.map((institution) => {
-          const isOpen = openInstitution === institution.name;
-          const counts = TYPE_ORDER.map((type) => ({ type, total: institution.sessions.filter((s) => s.instrumentType === type).length }));
-          const tutors = Array.from(new Set(institution.sessions.map((s) => s.researcherName)));
-          const studentEntries = Array.from(institution.students.entries()).sort(([a], [b]) => a.localeCompare(b, 'es'));
-          return (
-            <section key={institution.name} className={`overflow-hidden rounded-xl border bg-white shadow-xs ${isOpen ? 'border-indigo-300 ring-2 ring-indigo-500/10' : 'border-slate-200'}`}>
+      {/* ---------- Página 2: estudiantes de una institución ---------- */}
+      {openInstitution && !openStudent && (() => {
+        const institution = institutions.find((item) => item.name === openInstitution)
+          || (() => {
+            const list = sessions.filter((s) => s.institution === openInstitution);
+            const students = new Map<string, ResearchSession[]>();
+            for (const session of list) for (const code of participantsOf(session)) students.set(code, [...(students.get(code) || []), session]);
+            return { name: openInstitution, sessions: list, students, latest: '' };
+          })();
+        const entries = Array.from(institution.students.entries()).sort(([a], [b]) => a.localeCompare(b, 'es'));
+        return (
+          <section className="space-y-4" aria-label={`Estudiantes de ${institution.name}`}>
+            <button type="button" onClick={() => setOpenInstitution(null)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Todas las instituciones
+            </button>
+            <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <FolderOpen className="h-8 w-8 text-amber-600" aria-hidden="true" />
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900">{institution.name}</h2>
+                  <p className="text-xs text-slate-500">{institution.sessions.length} formularios · {entries.length} estudiantes</p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => { setOpenInstitution(isOpen ? null : institution.name); setOpenStudent(null); }}
-                aria-expanded={isOpen}
-                className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50"
+                onClick={() => void downloadZip(institution.sessions, `audios_${safeName(institution.name)}`)}
+                disabled={busy === 'zip' || institution.sessions.every((session) => audioKeysOf(session).length === 0)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="flex min-w-0 items-center gap-3">
-                  {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />}
-                  <FolderOpen className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-base font-extrabold text-slate-900">{institution.name}</span>
-                    <span className="block text-xs text-slate-500">
-                      {institution.sessions.length} formularios · {studentEntries.length} estudiantes · {tutors.length} {tutors.length === 1 ? 'tutor' : 'tutores'} · último registro {formatDateTime(institution.latest)}
-                    </span>
-                  </span>
-                </span>
-                <span className="hidden shrink-0 gap-1.5 sm:flex">
-                  {counts.map(({ type, total }) => (
-                    <span key={type} className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${TYPE_STYLE[type]}`}>{type} {total}</span>
-                  ))}
-                </span>
+                <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Audios de esta institución (ZIP)
               </button>
+            </header>
+            {entries.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Sin estudiantes registrados.</p>}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {entries.map(([code, list]) => {
+                const audioCount = list.reduce((total, session) => total + audioKeysOf(session).length, 0);
+                const pendingCount = pendingAudios(list).length;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => setOpenStudent(`${institution.name}|${code}`)}
+                    className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xs transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
+                  >
+                    <span className="flex items-center gap-2">
+                      <GraduationCap className="h-5 w-5 text-slate-500" aria-hidden="true" />
+                      <span className="font-mono text-sm font-bold text-indigo-700">{code}</span>
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900">{nameOf(institution.name, code) || 'Sin nombre en SIMECT'}</span>
+                    <span className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      {TYPE_ORDER.map((type) => {
+                        const total = list.filter((s) => s.instrumentType === type).length;
+                        return total > 0 ? <span key={type} className={`rounded-full border px-2 py-0.5 font-bold ${TYPE_STYLE[type]}`}>{type} {total}</span> : null;
+                      })}
+                      {audioCount > 0 && <span className="inline-flex items-center gap-1 text-slate-600"><Headphones className="h-3.5 w-3.5" aria-hidden="true" />{audioCount}</span>}
+                      {pendingCount > 0 && <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-bold text-amber-900">{pendingCount} sin transcribir</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
-              {isOpen && (
-                <div className="divide-y divide-slate-100 border-t border-slate-100">
-                  <div className="flex justify-end bg-slate-50/60 px-5 py-2">
-                    <button
-                      type="button"
-                      onClick={() => void downloadZip(institution.sessions, `audios_${safeName(institution.name)}`)}
-                      disabled={busy === 'zip' || institution.sessions.every((session) => audioKeysOf(session).length === 0)}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Audios de esta institución (ZIP)
-                    </button>
+      {/* ---------- Página 3: el estudiante, como lo llenó el tutor ---------- */}
+      {openInstitution && openStudent && (() => {
+        const code = openStudent.split('|').slice(1).join('|');
+        const list = sessions.filter((session) => session.institution === openInstitution && participantsOf(session).includes(code))
+          .sort((a, b) => TYPE_ORDER.indexOf(a.instrumentType) - TYPE_ORDER.indexOf(b.instrumentType) || a.createdAt.localeCompare(b.createdAt));
+        const studentName = nameOf(openInstitution, code);
+        const pendingCount = pendingAudios(list).length;
+        const sortedQuestions = (type: InstrumentType) => questions.filter((question) => question.instrumentType === type).sort((a, b) => a.order - b.order);
+        return (
+          <section className="space-y-4" aria-label={`Formularios de ${code}`}>
+            <button type="button" onClick={() => setOpenStudent(null)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 hover:bg-slate-50">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {openInstitution}
+            </button>
+            <header className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <GraduationCap className="h-8 w-8 text-slate-500" aria-hidden="true" />
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900"><span className="font-mono text-indigo-700">{code}</span> {studentName && <span>· {studentName}</span>}</h2>
+                  <p className="text-xs text-slate-500">{openInstitution} · {list.length} {list.length === 1 ? 'formulario' : 'formularios'}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {pendingCount > 0 && (
+                  <button type="button" onClick={() => void transcribeStudent(openStudent, list)} disabled={Boolean(transcribing) || serverBusy} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Languages className="h-3.5 w-3.5" aria-hidden="true" /> {transcribing === openStudent ? 'Transcribiendo…' : `Transcribir audios (${pendingCount})`}
+                  </button>
+                )}
+                <button type="button" onClick={() => downloadStudentText(openInstitution, code, list)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" /> Descargar todos los textos
+                </button>
+                {list.some((session) => audioKeysOf(session).length > 0) && (
+                  <button type="button" onClick={() => void downloadZip(list, `audios_${safeName(code)}`)} disabled={busy === 'zip'} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-900 hover:bg-teal-50 disabled:opacity-50">
+                    <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Audios del estudiante (ZIP)
+                  </button>
+                )}
+              </div>
+            </header>
+
+            {list.map((session) => (
+              <article key={session.id} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${TYPE_STYLE[session.instrumentType]}`}>{TYPE_LABEL[session.instrumentType]}</span>
+                      <span className="font-mono text-xs font-bold text-slate-700">{session.instrumentCode}</span>
+                      <span className="text-xs text-slate-500">{session.grade} · sesión {session.sessionNumber}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                      <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" aria-hidden="true" /> Tutor: <strong className="text-slate-800">{session.researcherName}</strong></span>
+                      <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> {formatDateTime(session.createdAt)}</span>
+                    </div>
                   </div>
-                  {studentEntries.length === 0 && <p className="px-5 py-4 text-sm text-slate-500">Sin estudiantes registrados.</p>}
-                  {studentEntries.map(([code, list]) => {
-                    const studentKey = `${institution.name}|${code}`;
-                    const isStudentOpen = openStudent === studentKey;
-                    const studentName = nameOf(institution.name, code);
-                    const audioCount = list.reduce((total, session) => total + audioKeysOf(session).length, 0);
-                    return (
-                      <div key={studentKey}>
-                        <button
-                          type="button"
-                          onClick={() => setOpenStudent(isStudentOpen ? null : studentKey)}
-                          aria-expanded={isStudentOpen}
-                          className={`flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-sm hover:bg-slate-50 ${isStudentOpen ? 'bg-indigo-50/50' : ''}`}
-                        >
-                          <span className="flex min-w-0 items-center gap-3">
-                            {isStudentOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />}
-                            <GraduationCap className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-                            <span className="font-mono text-xs font-bold text-indigo-700">{code}</span>
-                            <span className="truncate font-semibold text-slate-900">{studentName || 'Sin nombre en SIMECT'}</span>
-                          </span>
-                          <span className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
-                            {TYPE_ORDER.map((type) => {
-                              const total = list.filter((s) => s.instrumentType === type).length;
-                              return total > 0 ? <span key={type} className={`rounded-full border px-2 py-0.5 font-bold ${TYPE_STYLE[type]}`}>{type} {total}</span> : null;
-                            })}
-                            {audioCount > 0 && <span className="inline-flex items-center gap-1"><Headphones className="h-3.5 w-3.5" aria-hidden="true" />{audioCount}</span>}
-                          </span>
-                        </button>
+                  <button type="button" onClick={() => downloadText(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
+                    <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Texto
+                  </button>
+                </div>
 
-                        {isStudentOpen && (
-                          <div className="space-y-2 bg-slate-50/60 px-5 py-4">
-                            <div className="flex flex-wrap justify-end gap-2">
-                              {pendingAudios(list).length > 0 && (
-                                <button type="button" onClick={() => void transcribeStudent(studentKey, list)} disabled={Boolean(transcribing) || serverBusy} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-teal-700 px-3 text-xs font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
-                                  <Languages className="h-3.5 w-3.5" aria-hidden="true" /> {transcribing === studentKey ? 'Transcribiendo…' : `Transcribir audios (${pendingAudios(list).length})`}
-                                </button>
-                              )}
-                              <button type="button" onClick={() => downloadStudentText(institution.name, code, list)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
-                                <Download className="h-3.5 w-3.5" aria-hidden="true" /> Descargar todos los textos del estudiante
-                              </button>
-                            </div>
-                            {list
-                              .slice()
-                              .sort((a, b) => TYPE_ORDER.indexOf(a.instrumentType) - TYPE_ORDER.indexOf(b.instrumentType) || a.createdAt.localeCompare(b.createdAt))
-                              .map((session) => {
-                                const audios = audioKeysOf(session);
-                                return (
-                                  <article key={session.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="min-w-0 space-y-1">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${TYPE_STYLE[session.instrumentType]}`}>{TYPE_LABEL[session.instrumentType]}</span>
-                                        <span className="font-mono text-xs font-bold text-slate-700">{session.instrumentCode}</span>
-                                        <span className="text-xs text-slate-500">{session.grade}</span>
-                                      </div>
-                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-                                        <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" aria-hidden="true" /> Tutor: <strong className="text-slate-800">{session.researcherName}</strong></span>
-                                        <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> {formatDateTime(session.createdAt)}</span>
-                                        {session.instrumentType === 'GF' && <span>{participantsOf(session).length} participantes</span>}
-                                        {audios.length > 0 && Object.values(session.interviewRecords || {}).every((record) => !record.audioKey || record.transcribedAt) && <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-bold text-emerald-800">Transcrito</span>}
-                                        {audios.length > 0 && <span className="inline-flex items-center gap-1"><Headphones className="h-3.5 w-3.5" aria-hidden="true" /> {audios.length} {audios.length === 1 ? 'audio' : 'audios'}</span>}
-                                      </div>
-                                      {audios.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 pt-1">
-                                          {audios.map((audio) => {
-                                            const category = categoryOf(audio.questionId);
-                                            return (
-                                              <span key={audio.questionId} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700">
-                                                <Headphones className="h-3 w-3" aria-hidden="true" />
-                                                <strong>{audio.questionId}</strong>
-                                                {category ? <>· {category.name} <span className="text-slate-400">({category.family})</span></> : null}
-                                              </span>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex shrink-0 flex-wrap gap-2">
-                                      <button type="button" onClick={() => setViewing(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
-                                        <Eye className="h-3.5 w-3.5" aria-hidden="true" /> Ver
-                                      </button>
-                                      <button type="button" onClick={() => downloadText(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
-                                        <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Texto
-                                      </button>
-                                      {audios.length > 0 && (
-                                        <button type="button" onClick={() => void downloadAudios(session)} disabled={busy === session.id} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-700 px-3 text-xs font-bold text-white hover:bg-teal-800 disabled:opacity-60">
-                                          <Download className="h-3.5 w-3.5" aria-hidden="true" /> {busy === session.id ? 'Descargando…' : `Audios (${audios.length})`}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </article>
-                                );
-                              })}
+                <div className="space-y-4">
+                  {sortedQuestions(session.instrumentType).map((question) => {
+                    const category = categoryOf(question.id);
+                    const header = (
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-indigo-700">{question.code}</span>
+                          {category && <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700">{category.name} <span className="text-slate-400">({category.family})</span></span>}
+                        </div>
+                        <p className="text-sm font-semibold leading-snug text-slate-900">{question.prompt}</p>
+                      </div>
+                    );
+                    if (session.instrumentType === 'OBS') {
+                      const record = session.observationRecords?.[question.id];
+                      if (!record) return null;
+                      return (
+                        <div key={question.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                          {header}
+                          <p className="text-sm text-slate-800"><strong>Respuesta:</strong> {record.observed === 'not_applicable' ? 'No observado' : record.scaleValue || 'Sin dato'}</p>
+                          {record.observableEvidence && <p className="whitespace-pre-wrap text-sm text-slate-700"><strong>Evidencia:</strong> {record.observableEvidence}</p>}
+                        </div>
+                      );
+                    }
+                    if (session.instrumentType === 'GF') {
+                      const record = session.focusGroupRecords?.[question.id];
+                      if (!record) return null;
+                      return (
+                        <div key={question.id} className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                          {header}
+                          <ul className="space-y-2">
+                            {record.turns.map((turn, index) => (
+                              <li key={turn.id} className={`rounded-lg border p-3 text-sm ${turn.participantPseudonym === code ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'}`}>
+                                <strong className="font-mono text-xs text-indigo-700">{turn.participantPseudonym || `Intervención ${index + 1}`}</strong>
+                                <p className="mt-1 whitespace-pre-wrap text-slate-800">{turn.text || 'Sin transcripción'}</p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    }
+                    const record = session.interviewRecords?.[question.id];
+                    if (!record) return null;
+                    const text = (record.verbatimResponse || '').trim();
+                    return (
+                      <div key={question.id} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                        {header}
+                        {record.audioKey ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-teal-800"><Headphones className="h-3.5 w-3.5" aria-hidden="true" /> Audio</span>
+                            <StoredAudioPlayer audioKey={record.audioKey} />
                           </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">Esta respuesta no tiene audio.</p>
                         )}
+                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Transcripción</span>
+                            {record.audioKey && record.transcribedAt && (
+                              <button
+                                type="button"
+                                onClick={() => void startTranscription(openStudent, [{ sessionId: session.id, questionId: question.id, force: true }])}
+                                disabled={Boolean(transcribing) || serverBusy}
+                                className="text-[11px] font-bold text-teal-800 underline hover:text-teal-900 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Volver a transcribir
+                              </button>
+                            )}
+                          </div>
+                          {text ? (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{text}</p>
+                          ) : (
+                            <p className="text-sm font-semibold text-amber-800">Aún sin transcripción{record.audioKey ? ': usa «Transcribir audios» arriba.' : '.'}</p>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+              </article>
+            ))}
+          </section>
+        );
+      })()}
 
       {viewing && <SessionDetailModal session={viewing} onClose={() => setViewing(null)} />}
     </div>

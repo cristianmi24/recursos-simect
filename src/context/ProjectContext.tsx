@@ -56,7 +56,7 @@ interface ProjectContextType {
   transcribingKey: string;
   transcriptionProgress: string;
   transcriptionMessage: { tone: 'error' | 'ok'; text: string } | null;
-  startTranscription: (studentKey: string, jobs: { sessionId: string; questionId: string }[]) => Promise<void>;
+  startTranscription: (studentKey: string, jobs: { sessionId: string; questionId: string; force?: boolean }[]) => Promise<void>;
 
   addSession: (session: ResearchSessionDraft) => Promise<ResearchSession>;
   updateSession: (session: ResearchSession) => Promise<ResearchSession>;
@@ -253,7 +253,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   const transcribingRef = useRef(false);
   const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-  const startTranscription = async (studentKey: string, jobs: { sessionId: string; questionId: string }[]) => {
+  const startTranscription = async (studentKey: string, jobs: { sessionId: string; questionId: string; force?: boolean }[]) => {
     if (jobs.length === 0 || transcribingRef.current) return;
     transcribingRef.current = true;
     setTranscribingKey(studentKey);

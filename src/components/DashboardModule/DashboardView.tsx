@@ -107,7 +107,7 @@ const safeName = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '_').replace
 const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export const DashboardView: React.FC = () => {
-  const { sessions, questions, categories, retryData } = useProject();
+  const { sessions, questions, categories, transcriptionServerBusy: serverBusy, transcribingKey: transcribing, transcriptionProgress: transcribeProgress, transcriptionMessage: transcribeMessage, startTranscription } = useProject();
   const [simectUsers, setSimectUsers] = useState<SimectUser[]>([]);
   const [search, setSearch] = useState('');
   const [openInstitution, setOpenInstitution] = useState<string | null>(null);
@@ -116,10 +116,6 @@ export const DashboardView: React.FC = () => {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
   const [zipProgress, setZipProgress] = useState('');
-  const [serverBusy, setServerBusy] = useState(false);
-  const [transcribing, setTranscribing] = useState('');
-  const [transcribeProgress, setTranscribeProgress] = useState('');
-  const [transcribeMessage, setTranscribeMessage] = useState<{ tone: 'error' | 'ok'; text: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -295,29 +291,6 @@ export const DashboardView: React.FC = () => {
     }
   };
 
-  // Si otra transcripción está en curso (de cualquier administrador), se bloquea hasta que termine.
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    const check = async () => {
-      try {
-        const response = await fetch('/api/admin/transcriptions/status', { credentials: 'same-origin' });
-        if (!response.ok) return;
-        const data = (await response.json()) as { busy: boolean };
-        if (!active) return;
-        const wasBusy = serverBusy;
-        setServerBusy(Boolean(data.busy));
-        if (data.busy) timer = window.setTimeout(check, 8000);
-        else if (wasBusy) retryData();
-      } catch {
-        /* sin conexión: se reintenta al volver a abrir el panel */
-      }
-    };
-    void check();
-    return () => { active = false; if (timer) window.clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const pendingAudios = (list: ResearchSession[]) =>
     list
       .filter((session) => session.instrumentType === 'E')
@@ -327,58 +300,8 @@ export const DashboardView: React.FC = () => {
           .map(([questionId]) => ({ session, questionId }))
       );
 
-  const transcribeStudent = async (studentKey: string, list: ResearchSession[]) => {
-    const jobs = pendingAudios(list);
-    if (jobs.length === 0 || transcribing) return;
-    setTranscribing(studentKey);
-    setTranscribeMessage(null);
-    let done = 0;
-    try {
-      for (const [index, job] of jobs.entries()) {
-        setTranscribeProgress(`Transcribiendo ${index + 1} de ${jobs.length}… puede tardar unos minutos por audio.`);
-        const started = await fetch('/api/admin/transcriptions/start', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: job.session.id, questionId: job.questionId })
-        });
-        const startData = await started.json().catch(() => ({}));
-        if (!started.ok) {
-          setTranscribeMessage({ tone: 'error', text: startData.error || 'No se pudo iniciar la transcripción.' });
-          if (startData.code === 'busy') setServerBusy(true);
-          return;
-        }
-        if (startData.state !== 'done') {
-          let finished = false;
-          for (let attempt = 0; attempt < 270 && !finished; attempt += 1) {
-            await pause(5000);
-            const poll = await fetch(`/api/admin/transcriptions/${job.session.id}/${job.questionId}`, { credentials: 'same-origin' });
-            const pollData = await poll.json().catch(() => ({}));
-            if (pollData.state === 'done') finished = true;
-            else if (pollData.state === 'failed') {
-              setTranscribeMessage({ tone: 'error', text: pollData.message || 'No se pudo transcribir el audio.' });
-              return;
-            } else if (pollData.state === 'idle') {
-              setTranscribeMessage({ tone: 'error', text: 'La transcripción se interrumpió. Inténtalo de nuevo.' });
-              return;
-            }
-          }
-          if (!finished) {
-            setTranscribeMessage({ tone: 'error', text: 'La transcripción tardó demasiado. Inténtalo de nuevo más tarde.' });
-            return;
-          }
-        }
-        done += 1;
-      }
-      setTranscribeMessage({ tone: 'ok', text: `Listo: ${done} ${done === 1 ? 'audio transcrito' : 'audios transcritos'} y guardado${done === 1 ? '' : 's'} en la base de datos.` });
-    } catch {
-      setTranscribeMessage({ tone: 'error', text: 'Se perdió la conexión durante la transcripción. Revisa y vuelve a intentarlo.' });
-    } finally {
-      setTranscribing('');
-      setTranscribeProgress('');
-      retryData();
-    }
-  };
+  const transcribeStudent = (studentKey: string, list: ResearchSession[]) =>
+    startTranscription(studentKey, pendingAudios(list).map((job) => ({ sessionId: job.session.id, questionId: job.questionId })));
 
   const statCards: { label: string; value: number; tone: string }[] = [
     { label: 'Formularios llenos', value: sessions.length, tone: 'text-slate-900' },

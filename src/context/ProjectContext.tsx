@@ -51,6 +51,12 @@ interface ProjectContextType {
   persistenceError: string;
   sessionsTruncated: boolean;
   retryData: () => void;
+  refreshSessions: () => Promise<void>;
+  transcriptionServerBusy: boolean;
+  transcribingKey: string;
+  transcriptionProgress: string;
+  transcriptionMessage: { tone: 'error' | 'ok'; text: string } | null;
+  startTranscription: (studentKey: string, jobs: { sessionId: string; questionId: string }[]) => Promise<void>;
 
   addSession: (session: ResearchSessionDraft) => Promise<ResearchSession>;
   updateSession: (session: ResearchSession) => Promise<ResearchSession>;
@@ -225,6 +231,121 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   }, [categories, codedFragments, triangulationEntries, dataStatus, user.role]);
 
   const retryData = () => setRetryCounter((current) => current + 1);
+
+  // Actualiza los formularios sin mostrar la pantalla de carga (no interrumpe lo que el administrador está haciendo).
+  const refreshSessions = async () => {
+    try {
+      const payload = await requestJson<{ sessions: ResearchSession[]; truncated: boolean }>('/api/sessions');
+      if (Array.isArray(payload.sessions)) {
+        setSessions(payload.sessions);
+        setSessionsTruncated(Boolean(payload.truncated));
+      }
+    } catch {
+      /* si falla, se conserva la lista actual */
+    }
+  };
+
+  // ---- Transcripción de audios (administrador). Vive aquí para que siga aunque se cambie de sección. ----
+  const [transcriptionServerBusy, setTranscriptionServerBusy] = useState(false);
+  const [transcribingKey, setTranscribingKey] = useState('');
+  const [transcriptionProgress, setTranscriptionProgress] = useState('');
+  const [transcriptionMessage, setTranscriptionMessage] = useState<{ tone: 'error' | 'ok'; text: string } | null>(null);
+  const transcribingRef = useRef(false);
+  const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const startTranscription = async (studentKey: string, jobs: { sessionId: string; questionId: string }[]) => {
+    if (jobs.length === 0 || transcribingRef.current) return;
+    transcribingRef.current = true;
+    setTranscribingKey(studentKey);
+    setTranscriptionMessage(null);
+    let done = 0;
+    try {
+      for (const [index, job] of jobs.entries()) {
+        setTranscriptionProgress(`Transcribiendo ${index + 1} de ${jobs.length}… puede tardar unos minutos por audio. Puedes cambiar de sección: seguirá en segundo plano.`);
+        const started = await fetch('/api/admin/transcriptions/start', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(job)
+        });
+        const startData = await started.json().catch(() => ({}));
+        if (!started.ok) {
+          setTranscriptionMessage({ tone: 'error', text: startData.error || 'No se pudo iniciar la transcripción.' });
+          if (startData.code === 'busy') setTranscriptionServerBusy(true);
+          return;
+        }
+        if (startData.state !== 'done') {
+          let finished = false;
+          for (let attempt = 0; attempt < 270 && !finished; attempt += 1) {
+            await wait(5000);
+            let pollData: { state?: string; message?: string } = {};
+            try {
+              const poll = await fetch(`/api/admin/transcriptions/${job.sessionId}/${job.questionId}`, { credentials: 'same-origin' });
+              pollData = await poll.json().catch(() => ({}));
+            } catch {
+              continue; // corte momentáneo de red: se reintenta; la petición sigue viva en el servidor
+            }
+            if (pollData.state === 'done') finished = true;
+            else if (pollData.state === 'failed') {
+              setTranscriptionMessage({ tone: 'error', text: pollData.message || 'No se pudo transcribir el audio.' });
+              return;
+            } else if (pollData.state === 'idle') {
+              setTranscriptionMessage({ tone: 'error', text: 'La transcripción se interrumpió. Inténtalo de nuevo.' });
+              return;
+            }
+          }
+          if (!finished) {
+            setTranscriptionMessage({ tone: 'error', text: 'La transcripción tardó demasiado. Inténtalo de nuevo más tarde.' });
+            return;
+          }
+        }
+        done += 1;
+        await refreshSessions();
+      }
+      setTranscriptionMessage({ tone: 'ok', text: `Listo: ${done} ${done === 1 ? 'audio transcrito' : 'audios transcritos'} y guardado${done === 1 ? '' : 's'} en la base de datos.` });
+    } catch {
+      setTranscriptionMessage({ tone: 'error', text: 'Se perdió la conexión durante la transcripción. Revisa y vuelve a intentarlo.' });
+    } finally {
+      transcribingRef.current = false;
+      setTranscribingKey('');
+      setTranscriptionProgress('');
+      await refreshSessions();
+    }
+  };
+
+  // Aviso si se intenta cerrar la pestaña con una transcripción en marcha.
+  useEffect(() => {
+    if (!transcribingKey) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [transcribingKey]);
+
+  // Si hay otra transcripción en curso (otro administrador o una sesión anterior), se refleja y se espera a que termine.
+  useEffect(() => {
+    if (user.role !== 'admin' || dataStatus !== 'ready') return;
+    let active = true;
+    let timer: number | undefined;
+    let wasBusy = false;
+    const check = async () => {
+      try {
+        const response = await fetch('/api/admin/transcriptions/status', { credentials: 'same-origin' });
+        if (!response.ok || !active) return;
+        const data = (await response.json()) as { busy: boolean };
+        if (!active) return;
+        const busyNow = Boolean(data.busy) && !transcribingRef.current;
+        setTranscriptionServerBusy(busyNow);
+        if (wasBusy && !data.busy) await refreshSessions();
+        wasBusy = busyNow;
+        if (data.busy || transcribingRef.current) timer = window.setTimeout(check, 8000);
+      } catch {
+        timer = window.setTimeout(check, 15000);
+      }
+    };
+    void check();
+    return () => { active = false; if (timer) window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.role, dataStatus, transcribingKey]);
 
   const logAction = (
     action: AuditLogEntry['action'],
@@ -416,6 +537,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
       questions, categories, sessions, codedFragments, triangulationEntries, auditLogs,
       currentResearcher, isPseudonymized, setIsPseudonymized, activeTab, setActiveTab,
       appMode, setAppMode, dataStatus, dataError, persistenceError, sessionsTruncated, retryData,
+      refreshSessions, transcriptionServerBusy, transcribingKey, transcriptionProgress, transcriptionMessage, startTranscription,
       addSession, updateSession, deleteSession, addCategory, updateCategory, deleteCategory,
       addCodedFragment, updateFragmentStatus, deleteCodedFragment, saveTriangulationEntry,
       logAction, exportProjectJson, importProjectJson, suggestCodingForExcerpt

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { clearStoredDrafts } from '../utils/draftStorage';
 
 export type AuthRole = 'tutor' | 'admin';
 
@@ -84,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: '{}'
       });
       if (!response.ok) return false;
+      clearStoredDrafts();
       setUser(null);
       return true;
     } catch {

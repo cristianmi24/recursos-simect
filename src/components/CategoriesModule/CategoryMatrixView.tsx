@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDialog } from '../DialogProvider';
 import { useProject } from '../../context/ProjectContext';
 import { CategoryDefinition, CategoryFamily } from '../../types';
 import {
@@ -23,6 +24,7 @@ import {
 export const CategoryMatrixView: React.FC = () => {
   const { questions, categories, addCategory, updateCategory, deleteCategory, currentResearcher } =
     useProject();
+  const dialog = useDialog();
 
   type FormKey = 'ALL' | 'OBS' | 'E' | 'GF';
   const FORM_PATTERNS: Record<Exclude<FormKey, 'ALL'>, RegExp> = {
@@ -125,7 +127,7 @@ export const CategoryMatrixView: React.FC = () => {
 
     if (editingCategory) {
       if (!formModificationReason.trim()) {
-        alert('Por rigor metodológico y trazabilidad, debe consignar el motivo de la modificación.');
+        void dialog.alert({ title: 'Falta el motivo de la modificación', message: 'Por rigor metodológico y trazabilidad, debe consignar el motivo de la modificación.' });
         return;
       }
       const updated: CategoryDefinition = {
@@ -166,10 +168,14 @@ export const CategoryMatrixView: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleDelete = (cat: CategoryDefinition) => {
-    if (confirm(`¿Confirma retirar la categoría ${cat.code} del libro de códigos? Los datos brutos no se borrarán pero se desvinculará este código.`)) {
-      deleteCategory(cat.id);
-    }
+  const handleDelete = async (cat: CategoryDefinition) => {
+    const ok = await dialog.confirm({
+      title: `¿Retirar la categoría ${cat.code}?`,
+      message: 'Se retirará del libro de códigos. Los datos brutos no se borrarán, pero se desvinculará este código.',
+      confirmLabel: 'Retirar categoría',
+      tone: 'danger'
+    });
+    if (ok) deleteCategory(cat.id);
   };
 
   const getFamilyColor = (family: CategoryFamily) => {
@@ -413,7 +419,7 @@ export const CategoryMatrixView: React.FC = () => {
                             </button>
       
                             <button
-                              onClick={() => handleDelete(cat)}
+                              onClick={() => void handleDelete(cat)}
                               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-700 border border-slate-200 transition-colors"
                               title="Retirar categoría"
                             >

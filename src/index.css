@@ -407,6 +407,8 @@ a:focus-visible,
 .shortcuts-popover-heading > button:hover { color: #344e3b; background: #e7efe5; }
 .shortcuts-popover-heading > button svg { width: 16px; height: 16px; }
 .shortcuts-instructions { margin: 14px 0 7px; color: #687a6b; font-size: 11px; }
+.shortcuts-group-title { margin: 14px 0 4px; color: #2f4a37; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.shortcuts-group-title + .shortcuts-instructions { margin-top: 0; }
 .shortcuts-list { display: grid; gap: 2px; margin: 0; }
 .shortcuts-list > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid #eff3ee; }
 .shortcuts-list dt { color: #43574a; font-size: 11px; }
@@ -769,3 +771,23 @@ a:focus-visible,
 .workspace-shell .text-\[11px\] { font-size: 12.5px; }
 .workspace-shell .text-xs { font-size: 13px; line-height: 1.45; }
 .workspace-shell .text-sm { font-size: 15px; }
+
+/* Atajos táctiles (celular y tablet) frente a atajos de teclado (computador). */
+.shortcuts-touch { display: none; }
+.shortcuts-touch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+.shortcuts-touch-grid button { display: flex; min-height: 56px; align-items: center; gap: 10px; padding: 0 12px; border: 1px solid #dce7dc; border-radius: 14px; color: #2f4a37; background: #f5f9f4; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
+.shortcuts-touch-grid button[aria-current="page"] { border-color: #8db394; background: #e3f0e2; }
+.shortcuts-touch-grid button svg { width: 20px; height: 20px; flex: 0 0 auto; }
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+  .shortcuts-touch { display: block; }
+  .shortcut-prefix-status { display: none !important; }
+}
+@media (max-width: 639px), (hover: none) and (pointer: coarse) {
+  .shortcuts-keys, .shortcuts-keys-only, .shortcuts-trigger kbd { display: none !important; }
+  .shortcuts-trigger { min-height: 44px; }
+  .shortcuts-popover { right: 12px; left: 12px; width: auto; max-height: calc(100dvh - var(--app-header-h, 120px) - 110px); overflow-y: auto; }
+}
+
+/* Validación en línea: tras intentar enviar, los campos obligatorios vacíos se marcan en rojo. */
+.tutor-form form.was-submitted :is(input, select, textarea):invalid { border-color: #e11d48; background: #fff1f2; }
+.tutor-form form.was-submitted :is(input, select, textarea):invalid:focus { box-shadow: 0 0 0 3px rgba(225, 29, 72, .15); }

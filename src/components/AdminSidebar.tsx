@@ -72,7 +72,7 @@ export const AdminSidebar: React.FC<{ mobileOpen: boolean; onCloseMobile: () => 
     },
     {
       title: 'Accesos',
-      items: [{ id: 'users', label: 'Usuarios', hint: 'Cuentas de tutores', tone: 'rose', icon: <Users aria-hidden="true" /> }]
+      items: [{ id: 'users', label: 'Usuarios', hint: 'Cuentas y accesos', tone: 'rose', icon: <Users aria-hidden="true" /> }]
     }
   ];
 

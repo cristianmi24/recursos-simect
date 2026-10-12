@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDialog } from '../DialogProvider';
 import { useProject } from '../../context/ProjectContext';
 import {
   CodedFragment,
@@ -36,6 +37,7 @@ export const CodingWorkspaceView: React.FC = () => {
     currentResearcher,
     isPseudonymized
   } = useProject();
+  const dialog = useDialog();
 
   const [filterStatus, setFilterStatus] = useState<CodingStatus | 'ALL'>('ALL');
   const [filterInstrument, setFilterInstrument] = useState<InstrumentType | 'ALL'>('ALL');
@@ -113,7 +115,7 @@ export const CodingWorkspaceView: React.FC = () => {
 
   const handleAiSuggest = () => {
     if (!excerptText.trim()) {
-      alert('Por favor ingrese o pegue el fragmento textual antes de solicitar la sugerencia.');
+      void dialog.alert({ title: 'Falta el fragmento', message: 'Ingrese o pegue el fragmento textual antes de solicitar la sugerencia.' });
       return;
     }
     const suggestion = suggestCodingForExcerpt(excerptText);
@@ -133,7 +135,7 @@ export const CodingWorkspaceView: React.FC = () => {
     e.preventDefault();
 
     if (selectedCategories.length === 0) {
-      alert('Debe asignar al menos una categoría al fragmento.');
+      void dialog.alert({ title: 'Falta la categoría', message: 'Debe asignar al menos una categoría al fragmento.' });
       return;
     }
 
@@ -177,8 +179,14 @@ export const CodingWorkspaceView: React.FC = () => {
     );
   };
 
-  const handleRejectProposal = (fragId: string) => {
-    const reason = prompt('Indique el motivo del rechazo metodológico de esta propuesta:');
+  const handleRejectProposal = async (fragId: string) => {
+    const reason = await dialog.prompt({
+      title: 'Rechazar propuesta',
+      label: 'Motivo del rechazo metodológico',
+      confirmLabel: 'Rechazar',
+      tone: 'danger',
+      required: false
+    });
     if (reason !== null) {
       updateFragmentStatus(
         fragId,
@@ -509,7 +517,7 @@ export const CodingWorkspaceView: React.FC = () => {
                       </button>
 
                       <button
-                        onClick={() => handleRejectProposal(frag.id)}
+                        onClick={() => void handleRejectProposal(frag.id)}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-700 font-bold text-xs border border-rose-300 transition-colors"
                       >
                         <XCircle className="w-3.5 h-3.5" />
@@ -528,10 +536,9 @@ export const CodingWorkspaceView: React.FC = () => {
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('¿Confirma retirar este fragmento codificado?')) {
-                            deleteCodedFragment(frag.id);
-                          }
+                        onClick={async () => {
+                          const ok = await dialog.confirm({ title: '¿Retirar este fragmento codificado?', confirmLabel: 'Retirar', tone: 'danger' });
+                          if (ok) deleteCodedFragment(frag.id);
                         }}
                         className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 transition-colors"
                         title="Eliminar"

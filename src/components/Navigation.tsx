@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject, type ActiveTab } from '../context/ProjectContext';
+import { useQuickActions } from './MobileQuickBar';
 import {
   LayoutDashboard,
   LogOut,
@@ -11,7 +12,16 @@ import {
   X
 } from 'lucide-react';
 
-const SHORTCUT_TABS: ActiveTab[] = ['dashboard', 'audios', 'categories', 'coding', 'triangulation', 'reports', 'intake', 'audit', 'users'];
+// Atajos esenciales de Administración: G y luego la inicial de la sección.
+export const NAV_SHORTCUTS: { key: string; label: string; tab: ActiveTab | 'forms' }[] = [
+  { key: 'p', label: 'Panel', tab: 'dashboard' },
+  { key: 'a', label: 'Audios', tab: 'audios' },
+  { key: 's', label: 'Sesiones', tab: 'intake' },
+  { key: 'u', label: 'Usuarios', tab: 'users' },
+  { key: 'f', label: 'Formularios', tab: 'forms' }
+];
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+export const MOD_KEY_LABEL = isMac ? '⌘' : 'Ctrl';
 const BREADCRUMB_LABELS: Record<ActiveTab, string> = {
   dashboard: 'Panel',
   audios: 'Audios',
@@ -61,6 +71,15 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
   const prefixTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const userRole = user?.role ?? 'tutor';
   const headerRef = useRef<HTMLElement>(null);
+  const quickActions = useQuickActions(userRole);
+  const goToSection = (tab: ActiveTab | 'forms') => {
+    if (tab === 'forms') {
+      setAppMode('responder');
+      return;
+    }
+    setAppMode('admin');
+    setActiveTab(tab);
+  };
 
   // La altura de la cabecera fija dónde se ancla el menú lateral.
   useEffect(() => {
@@ -74,64 +93,61 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
   }, []);
 
   useEffect(() => {
+    const resetPrefix = () => {
+      shortcutPrefixRef.current = false;
+      setShortcutPrefix(false);
+      if (prefixTimer.current) clearTimeout(prefixTimer.current);
+    };
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       const target = event.target as HTMLElement | null;
       const isEditing = Boolean(target?.isContentEditable || target?.matches('input, textarea, select, [role="textbox"]'));
-      if (isEditing) {
-        shortcutPrefixRef.current = false;
-        setShortcutPrefix(false);
-        if (prefixTimer.current) clearTimeout(prefixTimer.current);
+      // Con un diálogo del sitio abierto, el teclado es solo para el diálogo.
+      if (isEditing || document.querySelector('[aria-modal="true"]')) {
+        resetPrefix();
         return;
       }
 
       if (event.key === 'Escape') {
         setShortcutsOpen(false);
-        shortcutPrefixRef.current = false;
-        setShortcutPrefix(false);
-        if (prefixTimer.current) clearTimeout(prefixTimer.current);
+        resetPrefix();
         return;
       }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
 
-      if (event.key === '?' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.key === '?') {
         event.preventDefault();
         setShortcutsOpen((open) => !open);
-        shortcutPrefixRef.current = false;
-        setShortcutPrefix(false);
+        resetPrefix();
         return;
       }
 
-      if (event.ctrlKey || event.metaKey || event.altKey || userRole !== 'admin') return;
-      if (event.key.toLowerCase() === 'g') {
+      if (event.key === '/') {
+        const search = document.querySelector<HTMLInputElement>('main input[type="search"]');
+        if (search) {
+          event.preventDefault();
+          search.focus();
+          search.select();
+        }
+        return;
+      }
+
+      if (userRole !== 'admin') return;
+      const key = event.key.toLowerCase();
+      if (!shortcutPrefixRef.current) {
+        if (key !== 'g') return;
         shortcutPrefixRef.current = true;
         setShortcutPrefix(true);
         if (prefixTimer.current) clearTimeout(prefixTimer.current);
-        prefixTimer.current = setTimeout(() => {
-          shortcutPrefixRef.current = false;
-          setShortcutPrefix(false);
-          prefixTimer.current = undefined;
-        }, 1600);
+        prefixTimer.current = setTimeout(resetPrefix, 1600);
         return;
       }
-
-      if (!shortcutPrefixRef.current) return;
-      const shortcutKey = event.key.toLowerCase();
-      const tabIndex = Number(shortcutKey) - 1;
-      if (Number.isInteger(tabIndex) && tabIndex >= 0 && tabIndex < SHORTCUT_TABS.length) {
-        event.preventDefault();
-        setAppMode('admin');
-        setActiveTab(SHORTCUT_TABS[tabIndex]);
-      } else if (shortcutKey === 'f') {
-        event.preventDefault();
-        setAppMode('responder');
-        setActiveTab('intake');
-      } else if (shortcutKey === 'a') {
-        event.preventDefault();
-        setAppMode('admin');
-        if (activeTab === 'intake') setActiveTab('dashboard');
-      }
-      shortcutPrefixRef.current = false;
-      setShortcutPrefix(false);
-      if (prefixTimer.current) clearTimeout(prefixTimer.current);
+      const shortcut = NAV_SHORTCUTS.find((item) => item.key === key);
+      resetPrefix();
+      if (!shortcut) return;
+      event.preventDefault();
+      setShortcutsOpen(false);
+      goToSection(shortcut.tab);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -139,7 +155,8 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
       window.removeEventListener('keydown', handleKeyDown);
       if (prefixTimer.current) clearTimeout(prefixTimer.current);
     };
-  }, [activeTab, setActiveTab, setAppMode, userRole]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setActiveTab, setAppMode, userRole]);
 
   if (!user) return null;
 
@@ -202,8 +219,8 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
             onClick={() => setShortcutsOpen((open) => !open)}
             aria-expanded={shortcutsOpen}
             aria-controls="workspace-shortcuts"
-            aria-label={shortcutsOpen ? 'Ocultar atajos de teclado' : 'Mostrar atajos de teclado'}
-            title="Atajos de teclado (?)"
+            aria-label={shortcutsOpen ? 'Ocultar atajos' : 'Mostrar atajos'}
+            title="Atajos (?)"
           >
             <CircleHelp aria-hidden="true" />
             <span className="hidden sm:inline">Atajos</span>
@@ -225,21 +242,41 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
 
       <section id="workspace-shortcuts" className="shortcuts-popover" aria-label="Atajos de teclado" hidden={!shortcutsOpen}>
           <div className="shortcuts-popover-heading">
-            <div><h2>Atajos de teclado</h2><p>Presiona <kbd>Esc</kbd> para cerrar</p></div>
+            <div><h2>Atajos</h2><p className="shortcuts-keys-only">Presiona <kbd>Esc</kbd> para cerrar</p></div>
             <button type="button" onClick={() => setShortcutsOpen(false)} aria-label="Cerrar atajos"><X aria-hidden="true" /></button>
           </div>
-          {user.role === 'admin' ? (
-            <><p className="shortcuts-instructions">Pulsa <kbd>G</kbd> y después la tecla indicada.</p><dl className="shortcuts-list">
-              {SHORTCUT_TABS.map((tab, index) => <div key={tab}><dt>{BREADCRUMB_LABELS[tab]}</dt><dd><kbd>G</kbd><kbd>{index + 1}</kbd></dd></div>)}
-              <div><dt>Formularios</dt><dd><kbd>G</kbd><kbd>F</kbd></dd></div>
-              <div><dt>Administración</dt><dd><kbd>G</kbd><kbd>A</kbd></dd></div>
+          <div className="shortcuts-touch">
+            <h3 className="shortcuts-group-title">Accesos rápidos</h3>
+            <div className="shortcuts-touch-grid">
+              {quickActions.map(({ id, label, icon: Icon, active, onClick }) => (
+                <button key={id} type="button" aria-current={active ? 'page' : undefined} onClick={() => { setShortcutsOpen(false); onClick(); }}>
+                  <Icon aria-hidden="true" /><span>{label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="shortcuts-hint">También los tienes siempre en la barra de abajo de la pantalla.</p>
+          </div>
+          <div className="shortcuts-keys">
+          {user.role === 'admin' && (
+            <><h3 className="shortcuts-group-title">Ir a</h3><p className="shortcuts-instructions">Pulsa <kbd>G</kbd> y después la inicial de la sección.</p><dl className="shortcuts-list">
+              {NAV_SHORTCUTS.map((item) => <div key={item.key}><dt>{item.label}</dt><dd><kbd>G</kbd><kbd>{item.key.toUpperCase()}</kbd></dd></div>)}
             </dl></>
-          ) : (
-            <p className="shortcuts-tutor-note">Los atajos de navegación están disponibles para el área de administración.</p>
           )}
-          <p className="shortcuts-hint">Escribe <kbd>?</kbd> en cualquier momento para abrir o cerrar esta ayuda.</p>
+          <h3 className="shortcuts-group-title">En los formularios</h3>
+          <dl className="shortcuts-list">
+            <div><dt>Siguiente pregunta (o enviar en la revisión)</dt><dd><kbd>{MOD_KEY_LABEL}</kbd><kbd>Enter</kbd></dd></div>
+            <div><dt>Pregunta anterior</dt><dd><kbd>{MOD_KEY_LABEL}</kbd><kbd>⇧</kbd><kbd>Enter</kbd></dd></div>
+          </dl>
+          <h3 className="shortcuts-group-title">General</h3>
+          <dl className="shortcuts-list">
+            {user.role === 'admin' && <div><dt>Buscar en el panel</dt><dd><kbd>/</kbd></dd></div>}
+            <div><dt>Mostrar u ocultar esta ayuda</dt><dd><kbd>?</kbd></dd></div>
+            <div><dt>Cerrar ventanas y ayudas</dt><dd><kbd>Esc</kbd></dd></div>
+          </dl>
+          <p className="shortcuts-hint">Los atajos con <kbd>{MOD_KEY_LABEL}</kbd> funcionan también mientras escribes; los demás, fuera de los campos de texto.</p>
+          </div>
       </section>
-      {shortcutPrefix && <span className="shortcut-prefix-status" role="status" aria-live="polite">Atajo: elige una opción…</span>}
+      {shortcutPrefix && <span className="shortcut-prefix-status" role="status" aria-live="polite">G… elige: P Panel · A Audios · S Sesiones · U Usuarios · F Formularios</span>}
     </header>
   );
 };

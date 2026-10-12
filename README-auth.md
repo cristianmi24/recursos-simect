@@ -6,12 +6,12 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 
 - La página inicial es un inicio de sesión para **Tutor** y **Administración**. No hay registro público ni cuentas o contraseñas de prueba para la autenticación real.
 - No existe modo demo ni datos de ejemplo: todo se lee y se guarda en Neon. Si `DATABASE_URL` no está configurada, el inicio de sesión queda deshabilitado.
-- Administración puede crear cuentas de **tutor** y activarlas o desactivarlas desde la pestaña **Usuarios**. Las cuentas de administración se crean solo con `npm run users:create`.
+- Administración puede crear cuentas de **tutor** o de **administración**, y activarlas o desactivarlas, desde la pestaña **Usuarios**, donde también ve el último ingreso (hora en formato de 12 horas), el número de ingresos y si hay una sesión abierta. Nadie puede desactivar su propia cuenta y siempre debe quedar al menos una cuenta de administración activa. Las cuentas también se pueden crear con `npm run users:create`.
 - El servidor valida correo, contraseña y rol; usa bcrypt (factor 12), limita intentos, crea una sesión opaca de ocho horas y solo guarda el hash SHA-256 del token en Neon. La cookie es `HttpOnly`, `SameSite=Strict` y, en producción, `Secure`.
 - Un tutor puede crear formularios y consultar solo los que creó su cuenta. La administración puede consultar, editar y retirar formularios de cualquier tutor.
 - La administración, los fragmentos codificados y las matrices de triangulación se cargan desde Neon y solo se modifican mediante rutas que vuelven a comprobar el rol en el servidor. El estado administrativo usa control de versión para no pisar silenciosamente cambios concurrentes.
 - El servidor atribuye y fecha los eventos de la bitácora. La aplicación no ofrece rutas para modificarla o borrarla; el retiro de una sesión y su evento se ejecutan atómicamente. Los eventos de otras operaciones dependen de escrituras separadas y pueden fallar sin revertir el cambio principal. La bitácora no es una prueba criptográfica contra quien tenga privilegios de propietario de la base.
-- Los formularios no se guardan en `localStorage`. El navegador mantiene el borrador solo en memoria hasta que el servidor confirma el guardado.
+- Los formularios no se guardan en `localStorage`. El borrador en curso se conserva en `sessionStorage` de esa pestaña para no perderlo al recargar; se borra al enviar, al descartar, al cerrar sesión o al cerrar la pestaña.
 
 ## Preparar Neon
 

@@ -162,10 +162,13 @@ function sessionDraft(session: ResearchSession, questions: QuestionDefinition[])
 
 export const TutorDataEntryFlow: React.FC = () => {
   const { questions, sessions, addSession, updateSession } = useProject();
-  const isAdmin = useAuth().user?.role === 'admin';
+  const authUser = useAuth().user;
+  const isAdmin = authUser?.role === 'admin';
   const dialog = useDialog();
   const segments = useSegments();
   const formPathRef = useRef<string[]>([]);
+  // Los audios en el dispositivo se separan por usuario: en un equipo compartido nadie sube los de otra persona.
+  const audioPrefix = () => `${authUser?.id ?? 'anon'}:${formPathRef.current.join('/')}|`;
   const [phase, setPhase] = useState<WizardPhase>('home');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>('OBS');
   const [stepIndex, setStepIndex] = useState(0);
@@ -304,7 +307,7 @@ export const TutorDataEntryFlow: React.FC = () => {
   const closeForm = () => {
     if (formPathRef.current.length) {
       storeDraft(formPathRef.current.join('/'), null);
-      void clearRecordings(`${formPathRef.current.join('/')}|`);
+      void clearRecordings(audioPrefix());
     }
     formPathRef.current = [];
     setPhase('home');
@@ -365,13 +368,13 @@ export const TutorDataEntryFlow: React.FC = () => {
 
   // Audios del formulario abierto: lista de pendientes, subida automática al volver la señal y,
   // cuando un audio termina de subir, se enlaza a su pregunta aunque esa pregunta no esté abierta.
-  const formKey = phase === 'form' ? formPathRef.current.join('/') : '';
+  const formKey = phase === 'form' ? audioPrefix() : '';
   useEffect(() => {
     if (!formKey) {
       setPendingAudios({});
       return;
     }
-    const prefix = `${formKey}|`;
+    const prefix = formKey;
     const refresh = () => {
       void listRecordings(prefix).then((items) => setPendingAudios(Object.fromEntries(items.map((item) => [item.questionId, item.status]))));
     };
@@ -591,7 +594,7 @@ export const TutorDataEntryFlow: React.FC = () => {
             studentCode={groupAudioCode(draft.participantPseudonyms)}
             missingCodeHint="Marca a los estudiantes participantes en los datos generales para poder grabar."
             questionId={question.id}
-            storageId={`${formPathRef.current.join('/')}|${question.id}`}
+            storageId={`${audioPrefix()}${question.id}`}
             onChange={(audio) => updateFocusGroup(question.id, { audioKey: audio.audioKey, audioMime: audio.audioMime, audioSeconds: audio.audioSeconds, audioTranscript: undefined, transcribedAt: undefined })}
           />
           <p className="text-xs leading-5 text-slate-500">{record.audioKey ? 'Con el audio guardado, las intervenciones escritas son opcionales: úsalas para anotar quién dijo qué.' : 'Graba la conversación o escribe las intervenciones (al menos una de las dos).'}</p>
@@ -631,7 +634,7 @@ export const TutorDataEntryFlow: React.FC = () => {
           consentApproved={draft.recordingConsentApproved}
           studentCode={draft.studentPseudonym}
           questionId={question.id}
-          storageId={`${formPathRef.current.join('/')}|${question.id}`}
+          storageId={`${audioPrefix()}${question.id}`}
           onChange={(audio) => updateInterview(question.id, { audioKey: audio.audioKey, audioMime: audio.audioMime, audioSeconds: audio.audioSeconds })}
         />
         <div className="space-y-2">

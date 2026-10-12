@@ -36,7 +36,7 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 - Cada pregunta de entrevista (E) y de grupo focal (GF) puede llevar un audio. En el grupo focal el audio es de toda la conversación de la pregunta; con audio, las intervenciones escritas son opcionales.
 - El audio se guarda primero en el dispositivo (IndexedDB) y luego se sube a Cloudflare R2. Mientras se graba se guarda cada 4 s, así que si la página se recarga o se cierra se recupera lo grabado. Una grabación sin aceptar también sobrevive a recargas y cambios de pregunta.
 - Al pulsar «Aceptar y guardar» sin conexión, el audio queda en cola en el dispositivo y se sube solo al volver la señal (también reintenta cada 30 s). El formulario no se puede enviar mientras haya un audio sin guardar o en cola.
-- Una vez subido y verificado (mismo tamaño en R2), el audio queda enlazado a la respuesta y se ve al recargar. Los audios en cola se borran del dispositivo al enviar o descartar el formulario y al cerrar sesión no se borran: se suben cuando se vuelve a abrir ese formulario.
+- Una vez subido y verificado (mismo tamaño en R2), el audio queda enlazado a la respuesta y se ve al recargar. Los audios del dispositivo se separan por usuario y se borran al enviar o descartar el formulario. Si se cierra sesión con un audio en cola, no se pierde: se sube cuando esa misma persona vuelve a abrir ese formulario.
 
 ## Protección y límites de los datos
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatDateTime } from '../../utils/dateFormat';
 import { useProject } from '../../context/ProjectContext';
 import { ResearchSession } from '../../types';
 import { X, Tag, Calendar, School, User, Clock, FileAudio, ExternalLink, CheckCircle } from 'lucide-react';
@@ -391,7 +392,7 @@ export const SessionDetailModal: React.FC<SessionDetailModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between text-xs">
           <span className="text-slate-500">
-            Última actualización: {new Date(session.updatedAt).toLocaleString()}
+            Última actualización: {formatDateTime(session.updatedAt)}
           </span>
           <div className="flex items-center gap-3">
             <button

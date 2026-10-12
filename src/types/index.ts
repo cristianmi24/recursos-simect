@@ -174,4 +174,9 @@ export interface ManagedUser {
   role: 'tutor' | 'admin';
   isActive: boolean;
   createdAt: string;
+  /** Último inicio de sesión (ISO), si alguna vez entró. */
+  lastLoginAt?: string;
+  loginCount?: number;
+  /** Tiene una sesión sin cerrar y sin vencer. */
+  hasOpenSession?: boolean;
 }

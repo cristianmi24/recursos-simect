@@ -1212,7 +1212,10 @@ function managedUserFromRow(row: Record<string, unknown>): ManagedUser {
     email: String(row.email),
     role: row.role === 'admin' ? 'admin' : 'tutor',
     isActive: Boolean(row.is_active),
-    createdAt: isoTimestamp(row.created_at)
+    createdAt: isoTimestamp(row.created_at),
+    ...(row.last_login_at ? { lastLoginAt: isoTimestamp(row.last_login_at) } : {}),
+    ...(row.login_count !== undefined ? { loginCount: Number(row.login_count) } : {}),
+    ...(row.has_open_session !== undefined ? { hasOpenSession: Boolean(row.has_open_session) } : {})
   };
 }
 
@@ -1222,8 +1225,15 @@ app.get('/api/admin/users', async (req, res) => {
   if (!requireAdmin(user, res)) return;
   try {
     const rows = await sql`
-      SELECT id, display_name, email, role, is_active, created_at
-      FROM auth_users ORDER BY role, display_name
+      SELECT u.id, u.display_name, u.email, u.role, u.is_active, u.created_at,
+             s.last_login_at, COALESCE(s.login_count, 0) AS login_count, COALESCE(s.has_open_session, FALSE) AS has_open_session
+      FROM auth_users AS u
+      LEFT JOIN (
+        SELECT user_id, max(created_at) AS last_login_at, count(*)::int AS login_count,
+               bool_or(revoked_at IS NULL AND expires_at > NOW()) AS has_open_session
+        FROM auth_sessions GROUP BY user_id
+      ) AS s ON s.user_id = u.id
+      ORDER BY u.role, u.display_name
     `;
     res.json({ users: rows.map((row) => managedUserFromRow(row as Record<string, unknown>)) });
   } catch (error) {
@@ -1231,7 +1241,7 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-// Administración solo crea cuentas de tutor; las cuentas admin se aprovisionan con `npm run users:create`.
+// Administración crea cuentas de tutor o de administración (también se pueden aprovisionar con `npm run users:create`).
 app.post('/api/admin/users', writeLimiter, allowSameOrigin, async (req, res) => {
   const user = await requireUser(req, res);
   if (!user || !sql) return;
@@ -1240,6 +1250,11 @@ app.post('/api/admin/users', writeLimiter, allowSameOrigin, async (req, res) => 
   const name = typeof input?.name === 'string' ? input.name.trim() : '';
   const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
   const password = typeof input?.password === 'string' ? input.password : '';
+  const role = input?.role === undefined ? 'tutor' : input.role;
+  if (role !== 'tutor' && role !== 'admin') {
+    res.status(400).json({ error: 'El tipo de cuenta no es válido.' });
+    return;
+  }
   if (name.length < 1 || name.length > 120) {
     res.status(400).json({ error: 'El nombre debe tener entre 1 y 120 caracteres.' });
     return;
@@ -1261,12 +1276,13 @@ app.post('/api/admin/users', writeLimiter, allowSameOrigin, async (req, res) => 
     const passwordHash = await bcrypt.hash(password, 12);
     const rows = await sql`
       INSERT INTO auth_users (display_name, email, password_hash, role)
-      VALUES (${name}, ${email}, ${passwordHash}, 'tutor')
+      VALUES (${name}, ${email}, ${passwordHash}, ${role})
       RETURNING id, display_name, email, role, is_active, created_at
     `;
     const created = managedUserFromRow(rows[0] as Record<string, unknown>);
     const auditEvent = await writeAuditEvent(user, {
-      action: 'create_user', entityType: 'user', entityId: created.id, summary: `Cuenta de tutor creada: ${created.email}`
+      action: 'create_user', entityType: 'user', entityId: created.id,
+      summary: `Cuenta de ${created.role === 'admin' ? 'administración' : 'tutor'} creada: ${created.email}`
     }).catch(() => null);
     res.status(201).json({ user: created, auditEvent });
   } catch (error) {
@@ -1284,21 +1300,30 @@ app.patch('/api/admin/users/:id', writeLimiter, allowSameOrigin, async (req, res
     return;
   }
   const isActive = input.isActive;
+  if (req.params.id === user.id) {
+    res.status(400).json({ error: 'No puedes desactivar tu propia cuenta.' });
+    return;
+  }
   try {
+    // Nunca se desactiva al último administrador activo: el sistema quedaría sin gestión.
     const rows = await sql`
       UPDATE auth_users SET is_active = ${isActive}, updated_at = NOW()
-      WHERE id::text = ${req.params.id} AND role = 'tutor'
+      WHERE id::text = ${req.params.id}
+        AND (${isActive} OR role = 'tutor' OR (
+          SELECT count(*) FROM auth_users WHERE role = 'admin' AND is_active AND id::text <> ${req.params.id}
+        ) > 0)
       RETURNING id, display_name, email, role, is_active, created_at
     `;
     if (!rows[0]) {
-      res.status(404).json({ error: 'No se encontró la cuenta de tutor.' });
+      const exists = await sql`SELECT 1 FROM auth_users WHERE id::text = ${req.params.id}`;
+      res.status(exists.length ? 409 : 404).json({ error: exists.length ? 'Debe quedar al menos una cuenta de administración activa.' : 'No se encontró la cuenta.' });
       return;
     }
     const updated = managedUserFromRow(rows[0] as Record<string, unknown>);
     if (!isActive) await sql`UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = ${updated.id} AND revoked_at IS NULL`;
     const auditEvent = await writeAuditEvent(user, {
       action: 'update_user', entityType: 'user', entityId: updated.id,
-      summary: `Cuenta de tutor ${isActive ? 'activada' : 'desactivada'}: ${updated.email}`
+      summary: `Cuenta de ${updated.role === 'admin' ? 'administración' : 'tutor'} ${isActive ? 'activada' : 'desactivada'}: ${updated.email}`
     }).catch(() => null);
     res.json({ user: updated, auditEvent });
   } catch (error) {

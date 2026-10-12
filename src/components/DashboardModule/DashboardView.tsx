@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { formatDateTime as formatDateTime12 } from '../../utils/dateFormat';
 import {
   ChevronDown,
   ChevronRight,
@@ -38,7 +39,7 @@ const TYPE_ORDER: InstrumentType[] = ['OBS', 'E', 'GF'];
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+  return formatDateTime12(date);
 };
 
 const audioKeysOf = (session: ResearchSession) =>

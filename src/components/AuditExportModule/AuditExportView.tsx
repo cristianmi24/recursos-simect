@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatDateTime } from '../../utils/dateFormat';
 import { useProject } from '../../context/ProjectContext';
 import {
   ShieldCheck,
@@ -299,7 +300,7 @@ export const AuditExportView: React.FC = () => {
                   </span>
                   <span className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
                     <Clock className="w-3 h-3" />
-                    <span>{new Date(log.timestamp).toLocaleString()}</span>
+                    <span>{formatDateTime(log.timestamp)}</span>
                   </span>
                 </div>
               </div>

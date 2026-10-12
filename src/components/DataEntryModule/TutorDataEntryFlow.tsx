@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,6 +26,9 @@ import type {
 } from '../../types';
 import { AudioRecorder, StoredAudioPlayer } from './AudioRecorder';
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
+import { navigate, useSegments } from '../../utils/router';
+import { useDialog } from '../DialogProvider';
+import { readStoredDraft, storeDraft } from '../../utils/draftStorage';
 
 type WizardPhase = 'home' | 'form';
 type InstrumentCardInfo = {
@@ -144,6 +147,9 @@ function sessionDraft(session: ResearchSession, questions: QuestionDefinition[])
 export const TutorDataEntryFlow: React.FC = () => {
   const { questions, sessions, addSession, updateSession } = useProject();
   const isAdmin = useAuth().user?.role === 'admin';
+  const dialog = useDialog();
+  const segments = useSegments();
+  const formPathRef = useRef<string[]>([]);
   const [phase, setPhase] = useState<WizardPhase>('home');
   const [selectedInstrument, setSelectedInstrument] = useState<InstrumentType>('OBS');
   const [stepIndex, setStepIndex] = useState(0);
@@ -227,6 +233,7 @@ export const TutorDataEntryFlow: React.FC = () => {
 
   const goToStep = (step: number) => {
     setStepIndex(step);
+    if (formPathRef.current.length) navigate([...formPathRef.current, ...(step > 0 ? [String(step + 1)] : [])], { replace: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -253,41 +260,96 @@ export const TutorDataEntryFlow: React.FC = () => {
     setErrorMessage('');
   };
 
-  const startNewForm = (type: InstrumentType) => {
+  // La URL manda: /formularios, /formularios/nuevo/<tipo>[/<paso>] o /formularios/editar/<id>[/<paso>].
+  // Las acciones solo navegan y este bloque abre o cierra el formulario, así que recargar o usar
+  // atrás/adelante deja a la persona en el mismo lugar. El borrador sin enviar se recupera de esta pestaña.
+  const openForm = (type: InstrumentType, session: ResearchSession | null, path: string[]) => {
+    const stored = readStoredDraft(path.join('/'));
     setSelectedInstrument(type);
-    setDraft(blankDraft(type, questions));
-    setEditingSession(null);
-    setStepIndex(0);
-    setErrorMessage('');
-    setSuccessMessage('');
-    setHasUnsavedChanges(false);
-    setSubmitAttempted(false);
-    setPhase('form');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const startEditing = (session: ResearchSession) => {
-    setSelectedInstrument(session.instrumentType);
-    setDraft(sessionDraft(session, questions));
+    setDraft(stored ?? (session ? sessionDraft(session, questions) : blankDraft(type, questions)));
     setEditingSession(session);
-    setStepIndex(0);
     setErrorMessage('');
     setSuccessMessage('');
-    setHasUnsavedChanges(false);
+    setHasUnsavedChanges(Boolean(stored));
     setSubmitAttempted(false);
     setPhase('form');
     setViewingSession(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const returnToHome = () => {
-    if (hasUnsavedChanges && !window.confirm('Hay cambios sin enviar. ¿Quieres salir y descartarlos?')) return;
+  const closeForm = () => {
+    if (formPathRef.current.length) storeDraft(formPathRef.current.join('/'), null);
+    formPathRef.current = [];
     setPhase('home');
     setDraft(null);
     setEditingSession(null);
     setHasUnsavedChanges(false);
     setErrorMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    const [, kind, target, stepRaw] = segments;
+    const type = kind === 'nuevo' && (target === 'OBS' || target === 'E' || target === 'GF') ? target : null;
+    const session = kind === 'editar' ? sessions.find((item) => item.id === target) ?? null : null;
+    if (type || session) {
+      const path = ['formularios', kind, target];
+      const instrument = type ?? session!.instrumentType;
+      if (formPathRef.current.join('/') !== path.join('/')) {
+        formPathRef.current = path;
+        openForm(instrument, session, path);
+      }
+      const lastStep = questions.filter((question) => question.instrumentType === instrument).length + 1;
+      setStepIndex(Math.min(Math.max((Number(stepRaw) || 1) - 1, 0), lastStep));
+      return;
+    }
+    if (kind) {
+      navigate(['formularios'], { replace: true });
+      return;
+    }
+    if (phase !== 'form') return;
+    if (!hasUnsavedChanges) {
+      closeForm();
+      return;
+    }
+    // Atrás con cambios sin enviar: se vuelve al formulario y se pregunta antes de descartar.
+    const path = [...formPathRef.current];
+    navigate([...path, ...(stepIndex > 0 ? [String(stepIndex + 1)] : [])]);
+    void dialog.confirm({
+      title: '¿Salir sin enviar?',
+      message: 'Hay cambios sin enviar en este formulario. Si sales, se descartarán.',
+      confirmLabel: 'Salir y descartar',
+      cancelLabel: 'Seguir editando',
+      tone: 'danger'
+    }).then((ok) => {
+      if (!ok) return;
+      setHasUnsavedChanges(false);
+      storeDraft(path.join('/'), null);
+      formPathRef.current = [];
+      navigate(['formularios']);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segments]);
+
+  // Guarda el borrador en esta pestaña para no perderlo al recargar.
+  useEffect(() => {
+    if (phase === 'form' && hasUnsavedChanges && draft && formPathRef.current.length) storeDraft(formPathRef.current.join('/'), draft);
+  }, [draft, phase, hasUnsavedChanges]);
+
+  const startNewForm = (type: InstrumentType) => navigate(['formularios', 'nuevo', type]);
+
+  const startEditing = (session: ResearchSession) => navigate(['formularios', 'editar', session.id]);
+
+  const returnToHome = async () => {
+    if (hasUnsavedChanges && !(await dialog.confirm({
+      title: '¿Salir sin enviar?',
+      message: 'Hay cambios sin enviar en este formulario. Si sales, se descartarán.',
+      confirmLabel: 'Salir y descartar',
+      cancelLabel: 'Seguir editando',
+      tone: 'danger'
+    }))) return;
+    closeForm();
+    navigate(['formularios']);
   };
 
   const continueToNextStep = () => {
@@ -376,13 +438,10 @@ export const TutorDataEntryFlow: React.FC = () => {
       const saved = editingSession
         ? await updateSession({ ...editingSession, ...draft, instrumentType: editingSession.instrumentType })
         : await addSession(draft);
+      closeForm();
+      navigate(['formularios']);
       setSuccessMessage(`${editingSession ? 'Se actualizaron tus respuestas' : 'Se envió el formulario'} (${saved.instrumentCode}).`);
-      setPhase('home');
-      setDraft(null);
-      setEditingSession(null);
-      setHasUnsavedChanges(false);
       setFilterType(saved.instrumentType);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       setErrorMessage(error instanceof Error
         ? error.message
@@ -590,7 +649,7 @@ export const TutorDataEntryFlow: React.FC = () => {
   return (
     <div className="tutor-form mx-auto max-w-6xl space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button type="button" onClick={returnToHome} className="inline-flex min-h-12 w-fit items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />Volver a formularios</button>
+        <button type="button" onClick={() => void returnToHome()} className="inline-flex min-h-12 w-fit items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />Volver a formularios</button>
         <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">{editingSession ? `Editando ${editingSession.instrumentCode}` : instrumentInfo.title}</span>
       </div>
 
@@ -650,7 +709,7 @@ export const TutorDataEntryFlow: React.FC = () => {
         </section>}
 
         <div className="sticky bottom-0 z-10 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:p-4">
-          <button type="button" onClick={() => stepIndex === 0 ? returnToHome() : goToStep(Math.max(0, stepIndex - 1))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />{stepIndex === 0 ? 'Cancelar y volver' : 'Paso anterior'}</button>
+          <button type="button" onClick={() => stepIndex === 0 ? void returnToHome() : goToStep(Math.max(0, stepIndex - 1))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />{stepIndex === 0 ? 'Cancelar y volver' : 'Paso anterior'}</button>
           {stepIndex === reviewStepIndex
             ? <button type="submit" disabled={isSaving} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 text-sm font-extrabold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"><CheckCircle2 size={17} aria-hidden="true" />{isSaving ? 'Guardando…' : editingSession ? 'Confirmar cambios' : 'Confirmar y enviar'}</button>
             : <button type="button" onClick={(event) => { event.preventDefault(); continueToNextStep(); }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 text-sm font-extrabold text-white hover:bg-emerald-900">{stepIndex === 0 ? 'Continuar' : stepIndex === reviewStepIndex - 1 ? 'Revisar formulario' : 'Siguiente pregunta'}<ArrowRight size={17} aria-hidden="true" /></button>}

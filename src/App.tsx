@@ -22,6 +22,8 @@ import { DashboardView } from './components/DashboardModule/DashboardView';
 import { TutorDataEntryFlow } from './components/DataEntryModule/TutorDataEntryFlow';
 import { UsersView } from './components/UsersModule/UsersView';
 import { LoadingScreen } from './components/LoadingScreen';
+import { TOP_LEVEL_ROUTES, currentSegments } from './utils/router';
+import { DialogProvider } from './components/DialogProvider';
 
 const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
   const { appMode, activeTab, dataStatus, dataError, persistenceError, sessionsTruncated, retryData } = useProject();
@@ -117,12 +119,14 @@ const Application: React.FC = () => {
 };
 
 export default function App() {
-  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (pathname !== '/' && pathname !== '/index.html') return <NotFoundPage />;
+  const first = currentSegments()[0];
+  if (first !== undefined && first !== 'index.html' && !(TOP_LEVEL_ROUTES as readonly string[]).includes(first)) return <NotFoundPage />;
 
   return (
-    <AuthProvider>
-      <Application />
-    </AuthProvider>
+    <DialogProvider>
+      <AuthProvider>
+        <Application />
+      </AuthProvider>
+    </DialogProvider>
   );
 }

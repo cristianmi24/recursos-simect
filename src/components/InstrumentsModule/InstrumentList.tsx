@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDialog } from '../DialogProvider';
 import { useProject } from '../../context/ProjectContext';
 import { InstrumentType, ResearchSession } from '../../types';
 import { SessionModal } from './SessionModal';
@@ -20,6 +21,7 @@ import {
 export const InstrumentList: React.FC = () => {
   const { sessions, deleteSession, isPseudonymized, addCodedFragment, setActiveTab } =
     useProject();
+  const dialog = useDialog();
 
   const [filterType, setFilterType] = useState<InstrumentType | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,11 +58,18 @@ export const InstrumentList: React.FC = () => {
     setIsNewModalOpen(true);
   };
 
-  const handleDelete = (id: string, code: string) => {
-    if (confirm(`¿Confirma eliminar la sesión ${code}? Esta acción es irreversible.`)) {
-      void deleteSession(id).catch((error: unknown) => {
-        window.alert(error instanceof Error ? error.message : 'No se pudo eliminar la sesión.');
-      });
+  const handleDelete = async (id: string, code: string) => {
+    const ok = await dialog.confirm({
+      title: `¿Eliminar la sesión ${code}?`,
+      message: 'Se borrarán el formulario y sus audios. Esta acción es irreversible.',
+      confirmLabel: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
+    try {
+      await deleteSession(id);
+    } catch (error) {
+      await dialog.alert({ title: 'No se pudo eliminar la sesión', message: error instanceof Error ? error.message : 'Inténtalo de nuevo.', tone: 'danger' });
     }
   };
 
@@ -84,7 +93,7 @@ export const InstrumentList: React.FC = () => {
       status: 'propuesta_pendiente',
       researcherName: 'Investigador Asignado'
     });
-    alert(`Fragmento de ${sessionCode} (${questionId}) transferido exitosamente a la cola de codificación.`);
+    void dialog.alert({ title: 'Fragmento enviado a codificación', message: `El fragmento de ${sessionCode} (${questionId}) se transfirió a la cola de codificación.` });
   };
 
   return (
@@ -317,7 +326,7 @@ export const InstrumentList: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleDelete(session.id, session.instrumentCode)}
+                  onClick={() => void handleDelete(session.id, session.instrumentCode)}
                   className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 transition-colors"
                   title="Eliminar sesión"
                 >

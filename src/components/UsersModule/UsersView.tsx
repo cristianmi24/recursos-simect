@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useDialog } from '../DialogProvider';
 import { Eye, EyeOff, GraduationCap, RefreshCw, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import type { ManagedUser } from '../../types';
 
@@ -17,6 +18,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 const dateFormatter = new Intl.DateTimeFormat('es', { dateStyle: 'medium' });
 
 export const UsersView: React.FC = () => {
+  const dialog = useDialog();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -68,7 +70,12 @@ export const UsersView: React.FC = () => {
   };
 
   const toggleActive = async (target: ManagedUser) => {
-    if (target.isActive && !confirm(`¿Desactivar la cuenta de ${target.name}? Se cerrarán sus sesiones abiertas y no podrá entrar.`)) return;
+    if (target.isActive && !(await dialog.confirm({
+      title: `¿Desactivar la cuenta de ${target.name}?`,
+      message: 'Se cerrarán sus sesiones abiertas y no podrá entrar hasta que la vuelvas a activar.',
+      confirmLabel: 'Desactivar cuenta',
+      tone: 'danger'
+    }))) return;
     setTogglingId(target.id);
     setNotice('');
     try {

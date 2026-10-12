@@ -22,6 +22,8 @@ import { useProject } from '../../context/ProjectContext';
 import type { InstrumentType, QuestionDefinition, ResearchSession } from '../../types';
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
 import { StoredAudioPlayer } from '../DataEntryModule/AudioRecorder';
+import { navigate, useSegments } from '../../utils/router';
+import { useDialog } from '../DialogProvider';
 
 type SimectUser = { institucion_nombre: string; usuario: string; nombres: string; apellidos: string };
 
@@ -113,8 +115,17 @@ export const DashboardView: React.FC = () => {
   const { sessions, questions, categories, transcriptionServerBusy: serverBusy, transcribingKey: transcribing, transcriptionProgress: transcribeProgress, transcriptionMessage: transcribeMessage, startTranscription, deleteSession } = useProject();
   const [simectUsers, setSimectUsers] = useState<SimectUser[]>([]);
   const [search, setSearch] = useState('');
-  const [openInstitution, setOpenInstitution] = useState<string | null>(null);
-  const [openStudent, setOpenStudent] = useState<string | null>(null);
+  // La institución y el estudiante abiertos viven en la URL: /panel/<institución>/<código>.
+  const dialog = useDialog();
+  const segments = useSegments();
+  const openInstitution = segments[0] === 'panel' && segments[1] ? segments[1] : null;
+  const openStudent = openInstitution && segments[2] ? `${openInstitution}|${segments[2]}` : null;
+  const setOpenInstitution = (name: string | null) => navigate(name ? ['panel', name] : ['panel']);
+  const setOpenStudent = (key: string | null) => {
+    if (!openInstitution) return;
+    const code = key ? key.split('|').slice(1).join('|') : '';
+    navigate(code ? ['panel', openInstitution, code] : ['panel', openInstitution]);
+  };
   const [viewing, setViewing] = useState<ResearchSession | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
@@ -302,12 +313,16 @@ export const DashboardView: React.FC = () => {
     const audios = list.reduce((total, session) => total + audioKeysOf(session).length, 0);
     const groups = list.filter((session) => session.instrumentType === 'GF');
     const what = list.length === 1 ? `el formulario ${list[0].instrumentCode} (${TYPE_LABEL[list[0].instrumentType]})` : `los ${list.length} formularios`;
-    const warning = [
-      `¿Borrar ${what} del estudiante ${code}${audios === 1 ? ' y su audio' : audios > 1 ? ` y sus ${audios} audios` : ''}?`,
-      'Se eliminan de la base de datos y no se pueden recuperar. El estudiante volverá a aparecer para que el tutor llene el formulario de nuevo.',
-      ...(groups.length ? ['Atención: un grupo focal incluye a varios estudiantes; se borrará para todos sus participantes.'] : [])
-    ].join('\n\n');
-    if (!window.confirm(warning)) return;
+    const ok = await dialog.confirm({
+      title: `¿Borrar ${what} del estudiante ${code}${audios === 1 ? ' y su audio' : audios > 1 ? ` y sus ${audios} audios` : ''}?`,
+      message: [
+        'Se eliminan de la base de datos y no se pueden recuperar. El estudiante volverá a aparecer para que el tutor llene el formulario de nuevo.',
+        ...(groups.length ? ['Atención: un grupo focal incluye a varios estudiantes; se borrará para todos sus participantes.'] : [])
+      ].join('\n\n'),
+      confirmLabel: 'Borrar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     setBusy('delete');
     setMessage('');
     let removed = 0;
@@ -457,7 +472,7 @@ export const DashboardView: React.FC = () => {
                 <button
                   key={institution.name}
                   type="button"
-                  onClick={() => { setOpenInstitution(institution.name); setOpenStudent(null); }}
+                  onClick={() => setOpenInstitution(institution.name)}
                   className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition-colors hover:border-indigo-300 hover:bg-indigo-50/30"
                 >
                   <span className="flex items-center gap-3">

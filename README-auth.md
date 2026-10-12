@@ -11,7 +11,7 @@ El nombre visible del producto es **SIMECT**. Se mantienen los identificadores h
 - Un tutor puede crear formularios y consultar solo los que creó su cuenta. La administración puede consultar, editar y retirar formularios de cualquier tutor.
 - La administración, los fragmentos codificados y las matrices de triangulación se cargan desde Neon y solo se modifican mediante rutas que vuelven a comprobar el rol en el servidor. El estado administrativo usa control de versión para no pisar silenciosamente cambios concurrentes.
 - El servidor atribuye y fecha los eventos de la bitácora. La aplicación no ofrece rutas para modificarla o borrarla; el retiro de una sesión y su evento se ejecutan atómicamente. Los eventos de otras operaciones dependen de escrituras separadas y pueden fallar sin revertir el cambio principal. La bitácora no es una prueba criptográfica contra quien tenga privilegios de propietario de la base.
-- Los formularios no se guardan en `localStorage`. El navegador mantiene el borrador solo en memoria hasta que el servidor confirma el guardado.
+- Los formularios no se guardan en `localStorage`. El borrador en curso se conserva en `sessionStorage` de esa pestaña para no perderlo al recargar; se borra al enviar, al descartar, al cerrar sesión o al cerrar la pestaña.
 
 ## Preparar Neon
 

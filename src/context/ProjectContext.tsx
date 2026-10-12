@@ -11,6 +11,7 @@ import type {
   CodingStatus
 } from '../types';
 import { INITIAL_QUESTIONS } from '../data/initialInstruments';
+import { currentSegments, navigate, useSegments } from '../utils/router';
 import { INITIAL_CATEGORIES } from '../data/initialCategories';
 
 export type ActiveTab =
@@ -25,6 +26,25 @@ export type ActiveTab =
   | 'users';
 
 export type AppMode = 'responder' | 'admin';
+
+// Primer tramo de la URL para cada pestaña de Administración; los formularios viven en /formularios.
+const TAB_ROUTES: Record<ActiveTab, string> = {
+  dashboard: 'panel',
+  audios: 'audios',
+  intake: 'registro',
+  categories: 'categorias',
+  coding: 'codificacion',
+  triangulation: 'triangulacion',
+  reports: 'reportes',
+  audit: 'auditoria',
+  users: 'usuarios'
+};
+const FORMS_ROUTE = 'formularios';
+
+function tabFromRoute(route: string | undefined): ActiveTab | null {
+  const entry = Object.entries(TAB_ROUTES).find(([, value]) => value === route);
+  return entry ? (entry[0] as ActiveTab) : null;
+}
 type DataStatus = 'loading' | 'ready' | 'error';
 interface AdminProjectState {
   categories: CategoryDefinition[];
@@ -144,8 +164,39 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode; user: AuthUs
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [currentResearcher] = useState<string>(user.name);
   const [isPseudonymized, setIsPseudonymized] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<ActiveTab>(user.role === 'admin' ? 'dashboard' : 'intake');
-  const [appMode, setAppMode] = useState<AppMode>(initialMode);
+  const isAdminUser = user.role === 'admin';
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => (isAdminUser && tabFromRoute(currentSegments()[0])) || (isAdminUser ? 'dashboard' : 'intake'));
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    if (!isAdminUser) return 'responder';
+    const route = currentSegments()[0];
+    if (route === FORMS_ROUTE) return 'responder';
+    return tabFromRoute(route) ? 'admin' : initialMode;
+  });
+  const segments = useSegments();
+  const route = segments[0];
+
+  // Atrás/adelante o un enlace cambian la URL: la pestaña la sigue.
+  useEffect(() => {
+    if (!isAdminUser) return;
+    if (route === FORMS_ROUTE) {
+      setAppMode('responder');
+      return;
+    }
+    const tab = tabFromRoute(route);
+    if (tab) {
+      setAppMode('admin');
+      setActiveTab(tab);
+    }
+  }, [route, isAdminUser]);
+
+  // Y al cambiar de pestaña se actualiza la URL, conservando lo que haya debajo (institución, estudiante, formulario…).
+  useEffect(() => {
+    const expected = !isAdminUser || appMode === 'responder' ? FORMS_ROUTE : TAB_ROUTES[activeTab];
+    if (route === expected) return;
+    const known = isAdminUser ? route === FORMS_ROUTE || Boolean(tabFromRoute(route)) : route === FORMS_ROUTE;
+    navigate([expected], { replace: !known });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, appMode, isAdminUser]);
   const [dataStatus, setDataStatus] = useState<DataStatus>('loading');
   const [dataError, setDataError] = useState('');
   const [persistenceError, setPersistenceError] = useState('');

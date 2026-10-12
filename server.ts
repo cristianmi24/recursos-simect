@@ -772,7 +772,7 @@ async function buildTranscriptContext(): Promise<{ text: string; interviews: num
     if (lines.length === 0) continue;
     // Solo el código del estudiante en SIMECT (p. ej. cc001), nunca su nombre.
     const student = typeof payload.studentPseudonym === 'string' && payload.studentPseudonym.trim() ? payload.studentPseudonym.trim() : 'sin código';
-    const header = `[${String(row.instrument_code)}] estudiante: ${student}; institución: ${String(payload.institution ?? '')}; grado: ${String(payload.grade ?? '')}; fecha: ${String(row.application_date ?? '')}`;
+    const header = `[${String(row.instrument_code)}] estudiante: ${student}; grado: ${String(payload.grade ?? '')}; fecha: ${String(row.application_date ?? '')}`;
     const entry = `${header}\n${lines.join('\n')}`;
     if (total + entry.length > chatContextLimit) { truncated = true; break; }
     parts.push(entry);
@@ -1027,6 +1027,24 @@ app.put('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) => 
   }
 });
 
+async function deleteSessionAudios(records: Record<string, unknown>): Promise<number> {
+  if (!r2Client || !r2Bucket) return 0;
+  let deleted = 0;
+  for (const raw of Object.values(records)) {
+    const record = parseJsonObject(raw);
+    if (!record) continue;
+    await deleteTempAudio(parseJsonObject(record.transcription)?.tempKey);
+    if (typeof record.audioKey !== 'string' || !AUDIO_KEY.test(record.audioKey)) continue;
+    try {
+      await r2Client.send(new DeleteObjectCommand({ Bucket: r2Bucket, Key: record.audioKey }));
+      deleted += 1;
+    } catch (error) {
+      console.error('No se pudo borrar un audio del formulario retirado.', error instanceof Error ? error.message : 'Error desconocido');
+    }
+  }
+  return deleted;
+}
+
 app.delete('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) => {
   const user = await requireUser(req, res);
   if (!user || !sql) return;
@@ -1039,7 +1057,7 @@ app.delete('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) 
     const rows = await sql`
       WITH deleted AS (
         DELETE FROM research_sessions WHERE id = ${req.params.id}::uuid
-        RETURNING id, instrument_code, instrument_type
+        RETURNING id, instrument_code, instrument_type, payload
       ), audit AS (
         INSERT INTO researcher_audit_log (actor_id, action, entity_type, entity_id, summary, details)
         SELECT ${user.id}::uuid, 'delete_session', 'session', deleted.id::text,
@@ -1048,16 +1066,20 @@ app.delete('/api/sessions/:id', writeLimiter, allowSameOrigin, async (req, res) 
         RETURNING id, created_at, actor_id, action, entity_type, entity_id, summary, details
       )
       SELECT audit.id, audit.created_at, audit.action, audit.entity_type, audit.entity_id,
-        user_row.display_name AS researcher, audit.summary, audit.details
+        user_row.display_name AS researcher, audit.summary, audit.details, deleted.payload
       FROM audit
       JOIN auth_users AS user_row ON user_row.id = audit.actor_id
+      CROSS JOIN deleted
     `;
     const auditRow = rows[0] as Record<string, unknown> | undefined;
     if (!auditRow) {
       res.status(404).json({ error: 'No se encontró la sesión.' });
       return;
     }
-    res.json({ ok: true, auditEvent: auditEntryFromRow(auditRow) });
+    // Con el formulario se borran también sus audios (y la copia temporal de una transcripción en curso).
+    const records = parseJsonObject(parseJsonObject(auditRow.payload)?.interviewRecords) || {};
+    const audiosDeleted = await deleteSessionAudios(records);
+    res.json({ ok: true, auditEvent: auditEntryFromRow(auditRow), audiosDeleted });
   } catch (error) {
     responseError(res, error, 'No se pudo retirar la sesión.');
   }

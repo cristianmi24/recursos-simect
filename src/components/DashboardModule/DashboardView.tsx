@@ -14,6 +14,7 @@ import {
   Languages,
   ArrowLeft,
   Search,
+  Trash2,
   Users
 } from 'lucide-react';
 import { zipSync } from 'fflate';
@@ -109,7 +110,7 @@ const safeName = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '_').replace
 const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export const DashboardView: React.FC = () => {
-  const { sessions, questions, categories, transcriptionServerBusy: serverBusy, transcribingKey: transcribing, transcriptionProgress: transcribeProgress, transcriptionMessage: transcribeMessage, startTranscription } = useProject();
+  const { sessions, questions, categories, transcriptionServerBusy: serverBusy, transcribingKey: transcribing, transcriptionProgress: transcribeProgress, transcriptionMessage: transcribeMessage, startTranscription, deleteSession } = useProject();
   const [simectUsers, setSimectUsers] = useState<SimectUser[]>([]);
   const [search, setSearch] = useState('');
   const [openInstitution, setOpenInstitution] = useState<string | null>(null);
@@ -292,6 +293,34 @@ export const DashboardView: React.FC = () => {
     } finally {
       setBusy('');
       setZipProgress('');
+    }
+  };
+
+  // Borra formularios con sus audios; el estudiante queda libre para que el tutor lo vuelva a llenar.
+  const removeSessions = async (list: ResearchSession[], code: string, wholeStudent: boolean) => {
+    if (list.length === 0) return;
+    const audios = list.reduce((total, session) => total + audioKeysOf(session).length, 0);
+    const groups = list.filter((session) => session.instrumentType === 'GF');
+    const what = list.length === 1 ? `el formulario ${list[0].instrumentCode} (${TYPE_LABEL[list[0].instrumentType]})` : `los ${list.length} formularios`;
+    const warning = [
+      `¿Borrar ${what} del estudiante ${code}${audios === 1 ? ' y su audio' : audios > 1 ? ` y sus ${audios} audios` : ''}?`,
+      'Se eliminan de la base de datos y no se pueden recuperar. El estudiante volverá a aparecer para que el tutor llene el formulario de nuevo.',
+      ...(groups.length ? ['Atención: un grupo focal incluye a varios estudiantes; se borrará para todos sus participantes.'] : [])
+    ].join('\n\n');
+    if (!window.confirm(warning)) return;
+    setBusy('delete');
+    setMessage('');
+    let removed = 0;
+    try {
+      for (const session of list) {
+        await deleteSession(session.id);
+        removed += 1;
+      }
+      if (wholeStudent) setOpenStudent(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo borrar el formulario.');
+    } finally {
+      setBusy('');
     }
   };
 
@@ -551,6 +580,11 @@ export const DashboardView: React.FC = () => {
                     <Archive className="h-3.5 w-3.5" aria-hidden="true" /> Audios del estudiante (ZIP)
                   </button>
                 )}
+                {list.length > 0 && (
+                  <button type="button" onClick={() => void removeSessions(list, code, true)} disabled={busy === 'delete'} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {busy === 'delete' ? 'Borrando…' : 'Borrar formularios y audios del estudiante'}
+                  </button>
+                )}
               </div>
             </header>
 
@@ -568,9 +602,14 @@ export const DashboardView: React.FC = () => {
                       <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> {formatDateTime(session.createdAt)}</span>
                     </div>
                   </div>
-                  <button type="button" onClick={() => downloadText(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
-                    <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Texto
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => downloadText(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Texto
+                    </button>
+                    <button type="button" onClick={() => void removeSessions([session], code, list.length === 1)} disabled={busy === 'delete'} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Borrar
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-4">

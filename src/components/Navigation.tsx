@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProject, type ActiveTab } from '../context/ProjectContext';
+import { useQuickActions } from './MobileQuickBar';
 import {
   LayoutDashboard,
   LogOut,
@@ -70,6 +71,7 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
   const prefixTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const userRole = user?.role ?? 'tutor';
   const headerRef = useRef<HTMLElement>(null);
+  const quickActions = useQuickActions(userRole);
   const goToSection = (tab: ActiveTab | 'forms') => {
     if (tab === 'forms') {
       setAppMode('responder');
@@ -217,8 +219,8 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
             onClick={() => setShortcutsOpen((open) => !open)}
             aria-expanded={shortcutsOpen}
             aria-controls="workspace-shortcuts"
-            aria-label={shortcutsOpen ? 'Ocultar atajos de teclado' : 'Mostrar atajos de teclado'}
-            title="Atajos de teclado (?)"
+            aria-label={shortcutsOpen ? 'Ocultar atajos' : 'Mostrar atajos'}
+            title="Atajos (?)"
           >
             <CircleHelp aria-hidden="true" />
             <span className="hidden sm:inline">Atajos</span>
@@ -240,9 +242,21 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
 
       <section id="workspace-shortcuts" className="shortcuts-popover" aria-label="Atajos de teclado" hidden={!shortcutsOpen}>
           <div className="shortcuts-popover-heading">
-            <div><h2>Atajos de teclado</h2><p>Presiona <kbd>Esc</kbd> para cerrar</p></div>
+            <div><h2>Atajos</h2><p className="shortcuts-keys-only">Presiona <kbd>Esc</kbd> para cerrar</p></div>
             <button type="button" onClick={() => setShortcutsOpen(false)} aria-label="Cerrar atajos"><X aria-hidden="true" /></button>
           </div>
+          <div className="shortcuts-touch">
+            <h3 className="shortcuts-group-title">Accesos rápidos</h3>
+            <div className="shortcuts-touch-grid">
+              {quickActions.map(({ id, label, icon: Icon, active, onClick }) => (
+                <button key={id} type="button" aria-current={active ? 'page' : undefined} onClick={() => { setShortcutsOpen(false); onClick(); }}>
+                  <Icon aria-hidden="true" /><span>{label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="shortcuts-hint">También los tienes siempre en la barra de abajo de la pantalla.</p>
+          </div>
+          <div className="shortcuts-keys">
           {user.role === 'admin' && (
             <><h3 className="shortcuts-group-title">Ir a</h3><p className="shortcuts-instructions">Pulsa <kbd>G</kbd> y después la inicial de la sección.</p><dl className="shortcuts-list">
               {NAV_SHORTCUTS.map((item) => <div key={item.key}><dt>{item.label}</dt><dd><kbd>G</kbd><kbd>{item.key.toUpperCase()}</kbd></dd></div>)}
@@ -260,6 +274,7 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
             <div><dt>Cerrar ventanas y ayudas</dt><dd><kbd>Esc</kbd></dd></div>
           </dl>
           <p className="shortcuts-hint">Los atajos con <kbd>{MOD_KEY_LABEL}</kbd> funcionan también mientras escribes; los demás, fuera de los campos de texto.</p>
+          </div>
       </section>
       {shortcutPrefix && <span className="shortcut-prefix-status" role="status" aria-live="polite">G… elige: P Panel · A Audios · S Sesiones · U Usuarios · F Formularios</span>}
     </header>

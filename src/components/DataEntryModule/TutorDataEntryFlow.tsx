@@ -695,7 +695,7 @@ export const TutorDataEntryFlow: React.FC = () => {
         <ul className="mt-2 space-y-1">{missingItems.map((item) => <li key={`${item.step}-${item.label}`} className="flex flex-wrap items-center justify-between gap-2"><span>• {item.label}</span><button type="button" onClick={() => goToStep(item.step)} className="min-h-9 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold text-rose-900 hover:bg-rose-100">Ir a {item.step === 0 ? 'Datos generales' : relevantQuestions[item.step - 1]?.code}</button></li>)}</ul>
       </div>}
 
-      <form id="tutor-wizard-form" noValidate onSubmit={(event) => void saveForm(event)} className="space-y-5">
+      <form id="tutor-wizard-form" noValidate onSubmit={(event) => void saveForm(event)} className={`space-y-5 ${submitAttempted ? 'was-submitted' : ''}`}>
         {stepIndex === 0 && <section className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div><h2 className="text-lg font-extrabold text-slate-900">1. Datos generales</h2><p className="mt-1 text-sm text-slate-600">Completa la información de la sesión antes de registrar respuestas.</p></div>
           <div className="grid gap-4 sm:grid-cols-2">

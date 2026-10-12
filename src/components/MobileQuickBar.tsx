@@ -5,20 +5,19 @@ import { navigate, useSegments } from '../utils/router';
 import type { AuthUser } from '../context/AuthContext';
 import type { InstrumentType } from '../types';
 
-// Atajos en pantalla para celular: una barra fija abajo con lo esencial.
+// Atajos en pantalla para celular y tablet (vertical u horizontal): una barra fija abajo, en la zona del pulgar.
 // Se oculta dentro de un formulario abierto, que ya tiene sus botones Anterior/Siguiente abajo.
-type Item = { id: string; label: string; icon: React.ElementType; active: boolean; onClick: () => void };
+export type QuickAction = { id: string; label: string; icon: React.ElementType; active: boolean; onClick: () => void };
 
-export const MobileQuickBar: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
+// Accesos esenciales según el rol; los usan la barra inferior y el panel «Atajos» en pantallas táctiles.
+export function useQuickActions(role: AuthUser['role']): QuickAction[] {
   const { appMode, setAppMode, activeTab, setActiveTab } = useProject();
-  const segments = useSegments();
   const inForms = role === 'tutor' || appMode === 'responder';
-  if (inForms && segments[0] === 'formularios' && segments[1]) return null;
 
   const goTab = (tab: ActiveTab) => { setAppMode('admin'); setActiveTab(tab); };
   const newForm = (type: InstrumentType) => navigate(['formularios', 'nuevo', type]);
 
-  const items: Item[] = role === 'admin'
+  return role === 'admin'
     ? [
         { id: 'panel', label: 'Panel', icon: LayoutDashboard, active: !inForms && activeTab === 'dashboard', onClick: () => goTab('dashboard') },
         { id: 'audios', label: 'Audios', icon: Headphones, active: !inForms && activeTab === 'audios', onClick: () => goTab('audios') },
@@ -32,14 +31,25 @@ export const MobileQuickBar: React.FC<{ role: AuthUser['role'] }> = ({ role }) =
         { id: 'GF', label: 'Grupo focal', icon: UsersRound, active: false, onClick: () => newForm('GF') },
         {
           id: 'historial', label: 'Mis envíos', icon: ClipboardList, active: false,
-          onClick: () => document.getElementById('tutor-history-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          onClick: () => {
+            navigate(['formularios']);
+            window.setTimeout(() => document.getElementById('tutor-history-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+          }
         }
       ];
+}
+
+export const MobileQuickBar: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
+  const { appMode } = useProject();
+  const segments = useSegments();
+  const items = useQuickActions(role);
+  const inForms = role === 'tutor' || appMode === 'responder';
+  if (inForms && segments[0] === 'formularios' && segments[1]) return null;
 
   return (
     <>
-      <div className="h-20 sm:hidden" aria-hidden="true" />
-      <nav aria-label="Accesos rápidos" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
+      <div className="h-20 lg:hidden" aria-hidden="true" />
+      <nav aria-label="Accesos rápidos" className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
         <ul className="grid" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
           {items.map(({ id, label, icon: Icon, active, onClick }) => (
             <li key={id}>

@@ -25,6 +25,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { TOP_LEVEL_ROUTES, currentSegments } from './utils/router';
 import { DialogProvider } from './components/DialogProvider';
 import { MobileQuickBar } from './components/MobileQuickBar';
+import { OfflineNotice } from './components/OfflineNotice';
 
 const MainContent: React.FC<{ role: AuthUser['role'] }> = ({ role }) => {
   const { appMode, activeTab, dataStatus, dataError, persistenceError, sessionsTruncated, retryData } = useProject();
@@ -100,6 +101,7 @@ const Workspace: React.FC<{ user: AuthUser }> = ({ user }) => {
         </div>
       </footer>
       <MobileQuickBar role={user.role} />
+      <OfflineNotice />
     </div>
   );
 };

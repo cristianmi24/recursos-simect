@@ -62,10 +62,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
       <section className="auth-story" aria-label="SIMECT">
         <div className="auth-story-shade" />
         <div className="auth-brand">
-          <div className="auth-mark" aria-hidden="true"><span>S</span><i /></div>
           <div>
-            <div className="auth-brand-name">SIMECT <span>STI</span></div>
-            <div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div>
+            <img src="/simectblanco.png" alt="SIMECT" className="auth-logo" />
+            <div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA · STI</div>
           </div>
         </div>
 
@@ -89,8 +88,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ configured, offline }) => 
       <section className="auth-panel">
         <div className="auth-panel-inner">
           <div className="auth-mobile-brand">
-            <div className="auth-mark" aria-hidden="true"><span>S</span><i /></div>
-            <div><div className="auth-brand-name">SIMECT <span>STI</span></div><div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA</div></div>
+            <div className="auth-logo-pill"><img src="/simectblanco.png" alt="SIMECT" className="auth-logo" /></div>
+            <div className="auth-brand-caption">INVESTIGACIÓN EDUCATIVA · STI</div>
           </div>
           <div className="auth-panel-overline">PORTAL DE ACCESO <span>01 / 02</span></div>
           <h2>Bienvenido<span className="auth-period">.</span></h2>

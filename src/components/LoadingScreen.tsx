@@ -15,7 +15,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ message }) => {
   return (
     <main className="loading-screen" role="status" aria-live="polite" aria-busy="true">
       <section className="loading-card" aria-label="Carga de SIMECT">
-        <div className="loading-brand-mark" aria-hidden="true">S</div>
+        <div className="loading-brand-mark loading-brand-logo" aria-hidden="true"><img src="/simectblanco.png" alt="" /></div>
         <div className="loading-spinner" aria-hidden="true" />
         <p className="loading-brand-name">SIMECT <span>STI</span></p>
         <h1>{message}</h1>

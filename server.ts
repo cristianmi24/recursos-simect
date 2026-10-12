@@ -1331,6 +1331,119 @@ app.patch('/api/admin/users/:id', writeLimiter, allowSameOrigin, async (req, res
   }
 });
 
+// Editar una cuenta (nombre, correo, tipo y, opcionalmente, nueva contraseña).
+app.put('/api/admin/users/:id', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  if (!requireAdmin(user, res)) return;
+  const input = isPlainRecord(req.body) ? req.body : null;
+  const name = typeof input?.name === 'string' ? input.name.trim() : '';
+  const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
+  const password = typeof input?.password === 'string' ? input.password : '';
+  const role = input?.role;
+  if (role !== 'tutor' && role !== 'admin') {
+    res.status(400).json({ error: 'El tipo de cuenta no es válido.' });
+    return;
+  }
+  if (name.length < 1 || name.length > 120) {
+    res.status(400).json({ error: 'El nombre debe tener entre 1 y 120 caracteres.' });
+    return;
+  }
+  if (!emailPattern.test(email) || email.length > 254) {
+    res.status(400).json({ error: 'Escribe un correo válido.' });
+    return;
+  }
+  if (password && ([...password].length < 12 || Buffer.byteLength(password, 'utf8') > 72)) {
+    res.status(400).json({ error: 'La nueva contraseña debe tener al menos 12 caracteres (máximo 72 bytes).' });
+    return;
+  }
+  if (req.params.id === user.id && role !== user.role) {
+    res.status(400).json({ error: 'No puedes cambiar el tipo de tu propia cuenta.' });
+    return;
+  }
+  try {
+    const duplicate = await sql`SELECT id FROM auth_users WHERE email = ${email} AND id::text <> ${req.params.id} LIMIT 1`;
+    if (duplicate.length > 0) {
+      res.status(409).json({ error: 'Ya existe otra cuenta con ese correo.' });
+      return;
+    }
+    const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+    // Nunca se quita el rol al último administrador activo.
+    const rows = await sql`
+      UPDATE auth_users SET display_name = ${name}, email = ${email}, role = ${role},
+        password_hash = COALESCE(${passwordHash}, password_hash), updated_at = NOW()
+      WHERE id::text = ${req.params.id}
+        AND (${role} = 'admin' OR role = 'tutor' OR NOT is_active OR (
+          SELECT count(*) FROM auth_users WHERE role = 'admin' AND is_active AND id::text <> ${req.params.id}
+        ) > 0)
+      RETURNING id, display_name, email, role, is_active, created_at
+    `;
+    if (!rows[0]) {
+      const exists = await sql`SELECT 1 FROM auth_users WHERE id::text = ${req.params.id}`;
+      res.status(exists.length ? 409 : 404).json({ error: exists.length ? 'Debe quedar al menos una cuenta de administración activa.' : 'No se encontró la cuenta.' });
+      return;
+    }
+    const updated = managedUserFromRow(rows[0] as Record<string, unknown>);
+    // Si cambió la contraseña o el tipo de cuenta, se cierran sus sesiones abiertas.
+    if (password) await sql`UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = ${updated.id} AND revoked_at IS NULL`;
+    const auditEvent = await writeAuditEvent(user, {
+      action: 'update_user', entityType: 'user', entityId: updated.id,
+      summary: `Cuenta editada: ${updated.email}${password ? ' (contraseña restablecida)' : ''}`
+    }).catch(() => null);
+    res.json({ user: updated, auditEvent });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === '42501') {
+      res.status(503).json({ error: 'Falta dar permiso para editar cuentas: ejecuta db/user-management.sql en Neon.' });
+      return;
+    }
+    responseError(res, error, 'No se pudo editar la cuenta.');
+  }
+});
+
+// Eliminar una cuenta. Solo es posible si no tiene formularios ni actividad registrada.
+app.delete('/api/admin/users/:id', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  if (!requireAdmin(user, res)) return;
+  if (req.params.id === user.id) {
+    res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
+    return;
+  }
+  try {
+    const target = await sql`SELECT id, email, role, is_active FROM auth_users WHERE id::text = ${req.params.id}`;
+    const found = target[0] as { id: string; email: string; role: string; is_active: boolean } | undefined;
+    if (!found) {
+      res.status(404).json({ error: 'No se encontró la cuenta.' });
+      return;
+    }
+    if (found.role === 'admin' && found.is_active) {
+      const others = await sql`SELECT count(*)::int AS total FROM auth_users WHERE role = 'admin' AND is_active AND id::text <> ${req.params.id}`;
+      if (Number((others[0] as { total: number }).total) < 1) {
+        res.status(409).json({ error: 'Debe quedar al menos una cuenta de administración activa.' });
+        return;
+      }
+    }
+    await sql`DELETE FROM auth_users WHERE id::text = ${req.params.id}`;
+    const auditEvent = await writeAuditEvent(user, {
+      action: 'update_user', entityType: 'user', entityId: found.id,
+      summary: `Cuenta eliminada: ${found.email}`
+    }).catch(() => null);
+    res.json({ ok: true, auditEvent });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === '23503') {
+      res.status(409).json({ error: 'Esta cuenta tiene formularios o actividad registrada y no se puede eliminar sin perder datos de investigación. Desactívala para bloquear su acceso.' });
+      return;
+    }
+    if (code === '42501') {
+      res.status(503).json({ error: 'Falta dar permiso para eliminar cuentas: ejecuta db/user-management.sql en Neon.' });
+      return;
+    }
+    responseError(res, error, 'No se pudo eliminar la cuenta.');
+  }
+});
+
 // En Vercel la SPA se sirve como estática desde dist/ y solo /api/* llega a la función (api/index.ts).
 if (isProduction && !isVercel) {
   const distDirectory = join(here, 'dist');

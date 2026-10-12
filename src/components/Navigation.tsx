@@ -177,10 +177,9 @@ export const Navigation: React.FC<{ onOpenSidebar?: () => void; sidebarOpen?: bo
               <Menu aria-hidden="true" />
             </button>
           )}
-          <div className="workspace-brand-mark w-10 h-10 rounded-xl bg-emerald-900 text-white flex items-center justify-center font-black tracking-tight text-sm shadow-xs">S</div>
+          <div className="workspace-brand-mark h-10 rounded-xl bg-emerald-900 px-3 flex items-center shadow-xs"><img src="/simectblanco.png" alt="SIMECT" className="h-6 w-auto" /></div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-base font-extrabold text-slate-900 tracking-tight">SIMECT</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">Gestión y Análisis Cualitativo STI</span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">Investigación Educativa: Experiencias, Percepciones y Dificultades con el Sistema Tutor Inteligente</p>

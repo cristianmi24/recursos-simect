@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { S3Client, PutObjectCommand, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { INITIAL_QUESTIONS } from './src/data/initialInstruments.js';
 import { INITIAL_CATEGORIES } from './src/data/initialCategories.js';
@@ -403,6 +403,31 @@ app.post('/api/audio/upload-url', writeLimiter, allowSameOrigin, async (req, res
   } catch (error) {
     console.error('No se pudo firmar la subida de audio.', error instanceof Error ? error.message : 'Error desconocido');
     res.status(503).json({ error: 'No se pudo preparar la subida del audio.' });
+  }
+});
+
+app.post('/api/audio/verify', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!r2Client || !r2Bucket) {
+    res.status(503).json({ error: 'El almacenamiento de audio no está configurado.' });
+    return;
+  }
+  const key = typeof req.body?.key === 'string' ? req.body.key : '';
+  const size = Number(req.body?.size);
+  if (!AUDIO_KEY.test(key) || (user.role !== 'admin' && !key.startsWith(`audio/${user.id}/`)) || !Number.isInteger(size) || size <= 0) {
+    res.status(400).json({ error: 'Solicitud no válida.' });
+    return;
+  }
+  try {
+    const head = await r2Client.send(new HeadObjectCommand({ Bucket: r2Bucket, Key: key }));
+    if (head.ContentLength !== size) {
+      res.status(409).json({ error: 'El audio guardado no coincide con la grabación.' });
+      return;
+    }
+    res.json({ ok: true, size: head.ContentLength });
+  } catch {
+    res.status(404).json({ error: 'No se encontró el audio guardado.' });
   }
 });
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import fixWebmDuration from 'fix-webm-duration';
 import { Check, Loader2, Mic, RotateCcw, Square, Trash2 } from 'lucide-react';
 
 const MAX_SECONDS = 900;
@@ -51,6 +52,7 @@ export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApprove
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const secondsRef = useRef(0);
+  const startedAtRef = useRef(0);
 
   const releaseStream = useCallback(() => {
     if (timerRef.current) window.clearInterval(timerRef.current);
@@ -82,6 +84,14 @@ export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApprove
       if (!signed.ok) throw new Error(payload.error || 'No se pudo preparar la subida.');
       const put = await fetch(payload.url, { method: 'PUT', headers: { 'Content-Type': payload.contentType }, body: pending.blob });
       if (!put.ok) throw new Error('El almacenamiento rechazó el audio.');
+      // Se comprueba que el archivo quedó completo en el almacenamiento (mismo tamaño que la grabación).
+      const check = await fetch('/api/audio/verify', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: payload.key, size: pending.blob.size })
+      });
+      if (!check.ok) throw new Error('El audio no se guardó completo. Vuelve a pulsar «Aceptar y guardar».');
       const saved = { audioKey: payload.key as string, audioMime: payload.contentType as string, audioSeconds: pending.seconds };
       setSavedPreview(URL.createObjectURL(pending.blob));
       setPending(null);
@@ -117,18 +127,25 @@ export const AudioRecorder: React.FC<Props> = ({ value, onChange, consentApprove
       const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
       recorder.ondataavailable = (event) => { if (event.data.size > 0) chunksRef.current.push(event.data); };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const baseMime = mimeType.split(';')[0];
-        const blob = new Blob(chunksRef.current, { type: baseMime });
+        let blob = new Blob(chunksRef.current, { type: baseMime });
+        const durationMs = Math.max(0, Date.now() - startedAtRef.current);
         releaseStream();
         if (blob.size === 0) {
           setStatus('idle');
           setError('No se capturó audio. Inténtalo de nuevo.');
           return;
         }
+        // El WebM de MediaRecorder no trae la duración: sin ella algunos reproductores no muestran el
+        // tiempo total ni dejan avanzar. Se escribe en el archivo antes de guardarlo.
+        if (baseMime === 'audio/webm') {
+          try { blob = await fixWebmDuration(blob, durationMs, { logger: false }); } catch { /* se guarda tal cual */ }
+        }
         setStatus('idle');
-        setPending({ blob, mime: baseMime, seconds: secondsRef.current, url: URL.createObjectURL(blob) });
+        setPending({ blob, mime: baseMime, seconds: Math.max(1, Math.round(durationMs / 1000)), url: URL.createObjectURL(blob) });
       };
+      startedAtRef.current = Date.now();
       recorder.start();
       secondsRef.current = 0;
       setSeconds(0);

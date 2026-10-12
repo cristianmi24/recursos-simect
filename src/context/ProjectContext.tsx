@@ -125,7 +125,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     credentials: 'same-origin',
     cache: 'no-store',
     ...init,
-    headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers }
+    headers: { Accept: 'application/json', ...(init?.body || (init?.method && init.method !== 'GET') ? { 'Content-Type': 'application/json' } : {}), ...init?.headers }
   });
   const payload: unknown = await response.json().catch(() => null);
   const errorText = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'

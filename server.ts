@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import express, { type NextFunction, type Request, type Response } from 'express';
+import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import helmet from 'helmet';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,20 +75,64 @@ app.use('/api', (_req, res, next) => {
 });
 app.use(express.json({ limit: '1mb', strict: true }));
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.' }
-});
-const writeLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Se alcanzó el límite temporal de operaciones. Inténtalo más tarde.' }
-});
+// Varios tutores suelen compartir la misma IP pública (Wi-Fi del colegio, datos móviles con CGNAT):
+// los límites se cuentan por cuenta/sesión y la IP queda solo como tope amplio.
+const clientIp = (req: Request) => ipKeyGenerator(req.ip ?? '');
+const tooManyAttempts = { error: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.' };
+const tooManyWrites = { error: 'Se alcanzó el límite temporal de operaciones. Inténtalo más tarde.' };
+// Aplica varios límites en orden como un solo middleware.
+function chainLimiters(...limiters: RequestHandler[]): RequestHandler {
+  return (req, res, next) => {
+    const run = (index: number): void => {
+      if (index === limiters.length) next();
+      else limiters[index](req, res, (error?: unknown) => (error ? next(error) : run(index + 1)));
+    };
+    run(0);
+  };
+}
+const loginLimiter = chainLimiters(
+  // Intentos fallidos contra una misma cuenta.
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    skipSuccessfulRequests: true,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `${clientIp(req)}|${typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase().slice(0, 254) : ''}`,
+    message: tooManyAttempts
+  }),
+  // Intentos fallidos desde una misma IP contra cualquier cuenta.
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 30,
+    skipSuccessfulRequests: true,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: clientIp,
+    message: tooManyAttempts
+  })
+);
+const writeLimiter = chainLimiters(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const token = readSessionToken(req);
+      return token ? `s:${sha256(token)}` : `ip:${clientIp(req)}`;
+    },
+    message: tooManyWrites
+  }),
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 600,
+    standardHeaders: false,
+    legacyHeaders: false,
+    keyGenerator: clientIp,
+    message: tooManyWrites
+  })
+);
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -246,6 +290,7 @@ app.get('/api/health', (_req, res) => {
 
 type SimectUser = { institucion_codigo: string; institucion_nombre: string; usuario: string; nombres: string; apellidos: string };
 let simectCache: { at: number; data: SimectUser[] } | null = null;
+let simectInFlight: Promise<SimectUser[]> | null = null;
 const simectCacheMs = 5 * 60 * 1000;
 
 // Instituciones y estudiantes registrados en simect.me. La clave vive solo en el servidor
@@ -264,24 +309,9 @@ app.get('/api/simect/usuarios', async (req, res) => {
     return;
   }
   try {
-    const upstream = await fetch(`${baseUrl}/api/v1/integracion/usuarios`, {
-      headers: { 'X-API-Key': apiKey },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!upstream.ok) {
-      console.error('SIMECT respondió', upstream.status);
-      res.status(502).json({ error: 'SIMECT no respondió correctamente.' });
-      return;
-    }
-    const raw = await upstream.json();
-    if (!Array.isArray(raw)) throw new Error('Respuesta inesperada de SIMECT');
-    const data: SimectUser[] = raw.map((row) => ({
-      institucion_codigo: String(row.institucion_codigo ?? ''),
-      institucion_nombre: String(row.institucion_nombre ?? ''),
-      usuario: String(row.usuario ?? ''),
-      nombres: String(row.nombres ?? ''),
-      apellidos: String(row.apellidos ?? '')
-    })).filter((row) => row.usuario && row.institucion_nombre);
+    // Si varios usuarios abren el formulario a la vez, comparten una sola consulta a SIMECT.
+    simectInFlight ??= fetchSimectUsers(baseUrl, apiKey).finally(() => { simectInFlight = null; });
+    const data = await simectInFlight;
     simectCache = { at: Date.now(), data };
     res.json(data);
   } catch (error) {
@@ -289,6 +319,23 @@ app.get('/api/simect/usuarios', async (req, res) => {
     res.status(502).json({ error: 'No se pudo consultar SIMECT en este momento.' });
   }
 });
+
+async function fetchSimectUsers(baseUrl: string, apiKey: string): Promise<SimectUser[]> {
+  const upstream = await fetch(`${baseUrl}/api/v1/integracion/usuarios`, {
+    headers: { 'X-API-Key': apiKey },
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!upstream.ok) throw new Error(`SIMECT respondió ${upstream.status}`);
+  const raw = await upstream.json();
+  if (!Array.isArray(raw)) throw new Error('Respuesta inesperada de SIMECT');
+  return raw.map((row) => ({
+    institucion_codigo: String(row.institucion_codigo ?? ''),
+    institucion_nombre: String(row.institucion_nombre ?? ''),
+    usuario: String(row.usuario ?? ''),
+    nombres: String(row.nombres ?? ''),
+    apellidos: String(row.apellidos ?? '')
+  })).filter((row) => row.usuario && row.institucion_nombre);
+}
 
 app.get('/api/auth/session', async (req, res) => {
   if (!sql) {

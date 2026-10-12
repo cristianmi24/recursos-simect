@@ -521,6 +521,8 @@ async function advanceTranscription(sessionId: string, questionId: string): Prom
 
   const resultUrl = data.output?.result?.transcription_url;
   const parsed = resultUrl ? new URL(resultUrl) : null;
+  // Qwen devuelve la URL del resultado con http://; se fuerza https y solo se acepta el dominio de Alibaba Cloud.
+  if (parsed && parsed.protocol === 'http:') parsed.protocol = 'https:';
   if (!parsed || parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.aliyuncs.com')) {
     await deleteTempAudio(job.tempKey);
     await clearJobMarker(sessionId, questionId);

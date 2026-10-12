@@ -173,6 +173,7 @@ export const TutorDataEntryFlow: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const relevantQuestions = useMemo(
     () => questions.filter((question) => question.instrumentType === selectedInstrument),
@@ -183,6 +184,51 @@ export const TutorDataEntryFlow: React.FC = () => {
     ? relevantQuestions[stepIndex - 1]
     : undefined;
   const instrumentInfo = instrumentCards.find((instrument) => instrument.type === selectedInstrument) || instrumentCards[0];
+
+  // Lo que falta para poder enviar, con el paso donde se completa. Se puede recorrer el formulario
+  // en cualquier orden; la comprobación se hace al enviar.
+  const missingItems = useMemo(() => {
+    if (!draft) return [];
+    const items: { step: number; label: string }[] = [];
+    const blank = (value: string | undefined) => !value?.trim();
+    if (blank(draft.date)) items.push({ step: 0, label: 'Fecha de aplicación' });
+    if (blank(draft.institution)) items.push({ step: 0, label: 'Institución educativa' });
+    if (blank(draft.grade)) items.push({ step: 0, label: 'Grado' });
+    if (selectedInstrument === 'GF') {
+      const count = draft.participantPseudonyms?.length || 0;
+      if (count === 0) items.push({ step: 0, label: 'Estudiantes participantes' });
+      if (count > 30) items.push({ step: 0, label: 'Máximo 30 estudiantes participantes' });
+    } else if (blank(draft.studentPseudonym)) {
+      items.push({ step: 0, label: 'Estudiante' });
+    }
+    if (!draft.recordingConsentApproved) items.push({ step: 0, label: 'Confirmación del consentimiento informado' });
+    relevantQuestions.forEach((question, index) => {
+      const step = index + 1;
+      if (selectedInstrument === 'OBS') {
+        const record = draft.observationRecords?.[question.id];
+        if (record?.observed === 'not_applicable') {
+          if (blank(record.notObservedReason)) items.push({ step, label: `${question.code}: motivo de no observación` });
+          return;
+        }
+        if (blank(record?.scaleValue)) items.push({ step, label: `${question.code}: respuesta registrada` });
+        if (blank(record?.observableEvidence)) items.push({ step, label: `${question.code}: evidencia observable` });
+      } else if (selectedInstrument === 'GF') {
+        const turns = draft.focusGroupRecords?.[question.id]?.turns || [];
+        if (turns.length === 0 || turns.some((turn) => blank(turn.participantPseudonym))) items.push({ step, label: `${question.code}: seudónimo de cada intervención` });
+        if (turns.length === 0 || turns.some((turn) => blank(turn.text))) items.push({ step, label: `${question.code}: transcripción de cada intervención` });
+      } else {
+        const record = draft.interviewRecords?.[question.id];
+        if (!record?.audioKey && blank(record?.verbatimResponse)) items.push({ step, label: `${question.code}: audio o transcripción de la respuesta` });
+      }
+    });
+    return items;
+  }, [draft, relevantQuestions, selectedInstrument]);
+  const incompleteSteps = new Set(missingItems.map((item) => item.step));
+
+  const goToStep = (step: number) => {
+    setStepIndex(step);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const updateDraft = (patch: Partial<ResearchSessionDraft>) => {
     setDraft((current) => current ? { ...current, ...patch } : current);
@@ -215,6 +261,7 @@ export const TutorDataEntryFlow: React.FC = () => {
     setErrorMessage('');
     setSuccessMessage('');
     setHasUnsavedChanges(false);
+    setSubmitAttempted(false);
     setPhase('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -227,6 +274,7 @@ export const TutorDataEntryFlow: React.FC = () => {
     setErrorMessage('');
     setSuccessMessage('');
     setHasUnsavedChanges(false);
+    setSubmitAttempted(false);
     setPhase('form');
     setViewingSession(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -242,20 +290,9 @@ export const TutorDataEntryFlow: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const validateCurrentStep = (): boolean => {
-    const form = document.getElementById('tutor-wizard-form') as HTMLFormElement | null;
-    return form?.reportValidity() ?? false;
-  };
-
   const continueToNextStep = () => {
-    if (!validateCurrentStep()) return;
-    if (stepIndex === 0 && selectedInstrument === 'GF' && (draft?.participantPseudonyms?.length || 0) > 30) {
-      setErrorMessage('El grupo focal admite hasta 30 seudónimos de participantes.');
-      return;
-    }
     setErrorMessage('');
-    setStepIndex((current) => Math.min(current + 1, reviewStepIndex));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    goToStep(Math.min(stepIndex + 1, reviewStepIndex));
   };
 
   const updateObservation = (questionId: string, patch: Partial<ObservationRecord>) => {
@@ -329,6 +366,11 @@ export const TutorDataEntryFlow: React.FC = () => {
     event.preventDefault();
     if (!draft || stepIndex !== reviewStepIndex || isSaving) return;
     setErrorMessage('');
+    if (missingItems.length > 0) {
+      setSubmitAttempted(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setIsSaving(true);
     try {
       const saved = editingSession
@@ -466,8 +508,8 @@ export const TutorDataEntryFlow: React.FC = () => {
     return (
       <section key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><span className="font-mono text-xs font-bold text-slate-600">{question.code}</span><h3 className="mt-1 text-sm font-bold leading-6 text-slate-900">{question.prompt}</h3></div>
-          <button type="button" onClick={() => setStepIndex(relevantQuestions.findIndex((item) => item.id === question.id) + 1)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><Pencil size={15} aria-hidden="true" />Editar</button>
+          <div><span className="font-mono text-xs font-bold text-slate-600">{question.code}</span>{incompleteSteps.has(relevantQuestions.indexOf(question) + 1) && <span className="ml-2 rounded-md bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">Falta completar</span>}<h3 className="mt-1 text-sm font-bold leading-6 text-slate-900">{question.prompt}</h3></div>
+          <button type="button" onClick={() => goToStep(relevantQuestions.indexOf(question) + 1)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><Pencil size={15} aria-hidden="true" />Editar</button>
         </div>
         <div className="mt-4 text-sm leading-6 text-slate-700">{answer}</div>
       </section>
@@ -554,21 +596,28 @@ export const TutorDataEntryFlow: React.FC = () => {
 
       <header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div><span className="font-mono text-xs font-extrabold text-slate-500">{instrumentInfo.range}</span><h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{editingSession ? 'Editar formulario' : instrumentInfo.title}</h1><p className="mt-2 text-sm leading-6 text-slate-600">Avanza paso a paso. Tus respuestas permanecerán en este formulario hasta que las envíes.</p></div>
+          <div><span className="font-mono text-xs font-extrabold text-slate-500">{instrumentInfo.range}</span><h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{editingSession ? 'Editar formulario' : instrumentInfo.title}</h1><p className="mt-2 text-sm leading-6 text-slate-600">Puedes recorrer las preguntas en el orden que quieras usando los pasos de abajo. Al enviar te avisaremos si falta algo.</p></div>
           <span className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900"><ShieldCheck size={15} aria-hidden="true" />Acceso protegido</span>
         </div>
         <div className="mt-6" aria-label={`Progreso: ${progressPercent}%`}>
           <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-600"><span>Paso {stepIndex + 1} de {reviewStepIndex + 1}</span><span>{progressPercent}%</span></div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-700 transition-all" style={{ width: `${progressPercent}%` }} /></div>
           <nav aria-label="Pasos del formulario" className="tutor-progress-steps mt-3 flex flex-wrap gap-2">
-            {progressLabels.map((label, index) => <button key={`${index}-${label}`} type="button" disabled={index >= stepIndex} aria-current={index === stepIndex ? 'step' : undefined} onClick={() => setStepIndex(index)} className={`min-h-10 rounded-lg px-3 text-xs font-bold ${index === stepIndex ? 'bg-emerald-800 text-white' : index < stepIndex ? 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100' : 'cursor-not-allowed bg-slate-50 text-slate-400'}`}>{label}</button>)}
+            {progressLabels.map((label, index) => {
+              const flagged = submitAttempted && incompleteSteps.has(index);
+              return <button key={`${index}-${label}`} type="button" aria-current={index === stepIndex ? 'step' : undefined} onClick={() => goToStep(index)} className={`min-h-10 rounded-lg px-3 text-xs font-bold ${index === stepIndex ? 'bg-emerald-800 text-white' : flagged ? 'border border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100'}`}>{label}{flagged && <span className="sr-only"> (falta completar)</span>}</button>;
+            })}
           </nav>
         </div>
       </header>
 
       {errorMessage && <div role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm leading-6 text-rose-950">{errorMessage}</div>}
+      {submitAttempted && missingItems.length > 0 && <div role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm leading-6 text-rose-950">
+        <p className="font-bold">No se puede enviar todavía. Falta completar:</p>
+        <ul className="mt-2 space-y-1">{missingItems.map((item) => <li key={`${item.step}-${item.label}`} className="flex flex-wrap items-center justify-between gap-2"><span>• {item.label}</span><button type="button" onClick={() => goToStep(item.step)} className="min-h-9 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold text-rose-900 hover:bg-rose-100">Ir a {item.step === 0 ? 'Datos generales' : relevantQuestions[item.step - 1]?.code}</button></li>)}</ul>
+      </div>}
 
-      <form id="tutor-wizard-form" onSubmit={(event) => void saveForm(event)} className="space-y-5">
+      <form id="tutor-wizard-form" noValidate onSubmit={(event) => void saveForm(event)} className="space-y-5">
         {stepIndex === 0 && <section className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div><h2 className="text-lg font-extrabold text-slate-900">1. Datos generales</h2><p className="mt-1 text-sm text-slate-600">Completa la información de la sesión antes de registrar respuestas.</p></div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -593,7 +642,7 @@ export const TutorDataEntryFlow: React.FC = () => {
         {stepIndex === reviewStepIndex && <section className="space-y-5 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm sm:p-7">
           <div><h2 className="text-xl font-extrabold text-slate-900">Revisa antes de enviar</h2><p className="mt-1 text-sm leading-6 text-slate-600">Comprueba los datos y las respuestas. Usa cada botón «Editar» para volver directamente al paso correspondiente.</p></div>
           <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Datos generales</h3><p className="mt-1 text-xs text-slate-500">{instrumentInfo.title}</p></div><button type="button" onClick={() => setStepIndex(0)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><Pencil size={15} aria-hidden="true" />Editar</button></div>
+            <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">Datos generales{incompleteSteps.has(0) && <span className="ml-2 rounded-md bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">Falta completar</span>}</h3><p className="mt-1 text-xs text-slate-500">{instrumentInfo.title}</p></div><button type="button" onClick={() => goToStep(0)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"><Pencil size={15} aria-hidden="true" />Editar</button></div>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">{metadataSummary.map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-0.5 break-words text-sm text-slate-900">{value || 'Sin dato'}</dd></div>)}</dl>
           </section>
           {relevantQuestions.map(renderQuestionReview)}
@@ -601,7 +650,7 @@ export const TutorDataEntryFlow: React.FC = () => {
         </section>}
 
         <div className="sticky bottom-0 z-10 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:p-4">
-          <button type="button" onClick={() => stepIndex === 0 ? returnToHome() : setStepIndex((current) => Math.max(0, current - 1))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />{stepIndex === 0 ? 'Cancelar y volver' : 'Paso anterior'}</button>
+          <button type="button" onClick={() => stepIndex === 0 ? returnToHome() : goToStep(Math.max(0, stepIndex - 1))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><ArrowLeft size={17} aria-hidden="true" />{stepIndex === 0 ? 'Cancelar y volver' : 'Paso anterior'}</button>
           {stepIndex === reviewStepIndex
             ? <button type="submit" disabled={isSaving} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 text-sm font-extrabold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"><CheckCircle2 size={17} aria-hidden="true" />{isSaving ? 'Guardando…' : editingSession ? 'Confirmar cambios' : 'Confirmar y enviar'}</button>
             : <button type="button" onClick={(event) => { event.preventDefault(); continueToNextStep(); }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 text-sm font-extrabold text-white hover:bg-emerald-900">{stepIndex === 0 ? 'Continuar' : stepIndex === reviewStepIndex - 1 ? 'Revisar formulario' : 'Siguiente pregunta'}<ArrowRight size={17} aria-hidden="true" /></button>}

@@ -79,6 +79,8 @@ export interface ResearchSession {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  /** Cambio de institución hecho por Administración según SIMECT (para avisar al tutor). */
+  institutionChange?: { from: string; to: string; changedAt: string; changedBy?: string; acknowledgedAt?: string };
 }
 
 export type ResearchSessionDraft = Omit<

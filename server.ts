@@ -424,8 +424,12 @@ app.post('/api/admin/institutions/apply', writeLimiter, allowSameOrigin, async (
     const checks = (await institutionChecks(ids)).filter((item) => item.status === 'changed' && item.newInstitution);
     const updated: { sessionId: string; institution: string }[] = [];
     for (const item of checks) {
+      // Además del nombre, se deja constancia del cambio para avisar al tutor dueño del formulario.
+      const change = { from: item.currentInstitution, to: item.newInstitution, changedAt: new Date().toISOString(), changedBy: user.name };
       const rows = await sql`
-        UPDATE research_sessions SET payload = jsonb_set(payload, '{institution}', to_jsonb(${item.newInstitution}::text)), updated_at = NOW()
+        UPDATE research_sessions
+        SET payload = jsonb_set(jsonb_set(payload, '{institution}', to_jsonb(${item.newInstitution}::text)), '{institutionChange}', ${JSON.stringify(change)}::jsonb),
+            updated_at = NOW()
         WHERE id = ${item.sessionId}::uuid AND payload->>'institution' = ${item.currentInstitution}
         RETURNING id
       `;
@@ -443,6 +447,59 @@ app.post('/api/admin/institutions/apply', writeLimiter, allowSameOrigin, async (
       return;
     }
     responseError(res, error, 'No se pudieron actualizar las instituciones.');
+  }
+});
+
+// Avisos para quien llenó el formulario: Administración le cambió la institución según SIMECT.
+app.get('/api/notices', async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  try {
+    const rows = await sql`
+      SELECT id, instrument_type, instrument_code, payload->'institutionChange' AS change,
+             payload->>'studentPseudonym' AS student, payload->'participantPseudonyms' AS participants
+      FROM research_sessions
+      WHERE owner_id = ${user.id} AND payload ? 'institutionChange'
+        AND payload->'institutionChange'->>'acknowledgedAt' IS NULL
+      ORDER BY updated_at DESC LIMIT 50
+    `;
+    const notices = (rows as Record<string, unknown>[]).map((row) => {
+      const change = parseJsonObject(row.change) || {};
+      const participants = Array.isArray(row.participants) ? row.participants.map(String) : [];
+      return {
+        sessionId: String(row.id),
+        instrumentType: String(row.instrument_type),
+        instrumentCode: String(row.instrument_code),
+        codes: row.instrument_type === 'GF' ? participants : row.student ? [String(row.student)] : [],
+        from: String(change.from ?? ''),
+        to: String(change.to ?? ''),
+        changedAt: String(change.changedAt ?? '')
+      };
+    });
+    res.json({ notices });
+  } catch (error) {
+    responseError(res, error, 'No se pudieron cargar los avisos.');
+  }
+});
+
+app.post('/api/notices/ack', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql) return;
+  const ids = Array.isArray(req.body?.sessionIds) ? req.body.sessionIds.filter((id: unknown): id is string => typeof id === 'string' && /^[0-9a-fA-F-]{36}$/.test(id)) : [];
+  if (ids.length === 0 || ids.length > 50) {
+    res.status(400).json({ error: 'Solicitud no válida.' });
+    return;
+  }
+  try {
+    // Solo quien llenó el formulario marca el aviso como leído.
+    await sql`
+      UPDATE research_sessions
+      SET payload = jsonb_set(payload, '{institutionChange,acknowledgedAt}', to_jsonb(${new Date().toISOString()}::text))
+      WHERE owner_id = ${user.id} AND id::text = ANY(${ids}) AND payload ? 'institutionChange'
+    `;
+    res.json({ ok: true });
+  } catch (error) {
+    responseError(res, error, 'No se pudo marcar el aviso como leído.');
   }
 });
 

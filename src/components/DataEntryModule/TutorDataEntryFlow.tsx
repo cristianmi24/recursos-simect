@@ -588,6 +588,9 @@ export const TutorDataEntryFlow: React.FC = () => {
         <div className="space-y-5">
           {question.description && <p className="text-sm leading-6 text-slate-600">{question.description}</p>}
           <AudioRecorder
+            // Un grabador por pregunta: sin la key, React reutilizaba el mismo al cambiar de pregunta y
+            // seguía mostrando la vista previa (o la grabación sin aceptar) de la pregunta anterior.
+            key={`${audioPrefix()}${question.id}`}
             label="Audio de la conversación (toda la pregunta)"
             value={{ audioKey: record.audioKey, audioMime: record.audioMime, audioSeconds: record.audioSeconds }}
             consentApproved={draft.recordingConsentApproved}
@@ -630,6 +633,7 @@ export const TutorDataEntryFlow: React.FC = () => {
       <div className="space-y-5">
         {question.description && <p className="text-sm leading-6 text-slate-600">{question.description}</p>}
         <AudioRecorder
+          key={`${audioPrefix()}${question.id}`}
           value={{ audioKey: record.audioKey, audioMime: record.audioMime, audioSeconds: record.audioSeconds }}
           consentApproved={draft.recordingConsentApproved}
           studentCode={draft.studentPseudonym}

@@ -18,6 +18,7 @@ import {
   RefreshCw,
   ArrowRight,
   Trash2,
+  UserRoundPen,
   Users
 } from 'lucide-react';
 import { zipSync } from 'fflate';
@@ -150,6 +151,10 @@ export const DashboardView: React.FC = () => {
   const [institutionChecks, setInstitutionChecks] = useState<InstitutionCheck[] | null>(null);
   const [checkState, setCheckState] = useState<'idle' | 'checking' | 'applying'>('idle');
   const [checkMessage, setCheckMessage] = useState('');
+  // Corrección del estudiante de un formulario enviado (entrevista u observación).
+  const [studentEdit, setStudentEdit] = useState<{ sessionId: string; code: string } | null>(null);
+  const [studentEditBusy, setStudentEditBusy] = useState(false);
+  const [studentEditMessage, setStudentEditMessage] = useState<{ tone: 'ok' | 'error'; text: string; goTo?: { institution: string; code: string } } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -324,6 +329,44 @@ export const DashboardView: React.FC = () => {
     } finally {
       setBusy('');
       setZipProgress('');
+    }
+  };
+
+  const changeStudent = async (session: ResearchSession, newCode: string) => {
+    const target = simectUsers.find((item) => item.usuario === newCode);
+    if (!target) return;
+    const duplicate = sessions.some((item) => item.id !== session.id && item.instrumentType === session.instrumentType && item.studentPseudonym === newCode);
+    const institutionChanges = target.institucion_nombre !== session.institution;
+    const ok = await dialog.confirm({
+      title: `¿Cambiar el estudiante de ${session.instrumentCode}?`,
+      message: [
+        `${session.studentPseudonym || 'Sin código'} → ${newCode}${nameOf(target.institucion_nombre, newCode) ? ` (${nameOf(target.institucion_nombre, newCode)})` : ''}.`,
+        institutionChanges ? `La institución también cambia a «${target.institucion_nombre}», la de ese estudiante en SIMECT.` : '',
+        duplicate ? `Atención: ${newCode} ya tiene otro formulario de ${TYPE_LABEL[session.instrumentType].toLowerCase()}.` : '',
+        'Las respuestas, audios y transcripciones quedan igual. Se avisará al tutor y quedará en la bitácora.'
+      ].filter(Boolean).join('\n\n'),
+      confirmLabel: 'Cambiar estudiante',
+      tone: duplicate ? 'danger' : 'info'
+    });
+    if (!ok) return;
+    setStudentEditBusy(true);
+    setStudentEditMessage(null);
+    try {
+      const response = await fetch(`/api/admin/sessions/${encodeURIComponent(session.id)}/student`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentCode: newCode })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo cambiar el estudiante.');
+      setStudentEdit(null);
+      setStudentEditMessage({ tone: 'ok', text: `${session.instrumentCode} ahora es del estudiante ${newCode}. Se avisará al tutor.`, goTo: { institution: data.institution, code: newCode } });
+      await refreshSessions();
+    } catch (error) {
+      setStudentEditMessage({ tone: 'error', text: error instanceof Error ? error.message : 'No se pudo cambiar el estudiante.' });
+    } finally {
+      setStudentEditBusy(false);
     }
   };
 
@@ -714,6 +757,19 @@ export const DashboardView: React.FC = () => {
               </div>
             </header>
 
+            {studentEditMessage && (
+              <div role={studentEditMessage.tone === 'error' ? 'alert' : 'status'} className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${studentEditMessage.tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                <span>{studentEditMessage.text}</span>
+                {studentEditMessage.goTo && (
+                  <button type="button" onClick={() => { const goTo = studentEditMessage.goTo!; setStudentEditMessage(null); navigate(['panel', goTo.institution, goTo.code]); }} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 text-xs font-bold text-emerald-900 hover:bg-emerald-100">
+                    Ver formularios de {studentEditMessage.goTo.code} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {list.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Este estudiante ya no tiene formularios.</p>}
+
             {list.map((session) => (
               <article key={session.id} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -732,11 +788,38 @@ export const DashboardView: React.FC = () => {
                     <button type="button" onClick={() => downloadText(session)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50">
                       <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Texto
                     </button>
+                    {session.instrumentType !== 'GF' && (
+                      <button type="button" onClick={() => { setStudentEditMessage(null); setStudentEdit(studentEdit?.sessionId === session.id ? null : { sessionId: session.id, code: '' }); }} aria-expanded={studentEdit?.sessionId === session.id} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 text-xs font-bold text-indigo-900 hover:bg-indigo-50">
+                        <UserRoundPen className="h-3.5 w-3.5" aria-hidden="true" /> Cambiar estudiante
+                      </button>
+                    )}
                     <button type="button" onClick={() => void removeSessions([session], code, list.length === 1)} disabled={busy === 'delete'} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-bold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50">
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Borrar
                     </button>
                   </div>
                 </div>
+
+                {studentEdit?.sessionId === session.id && (() => {
+                  const sameInstitution = simectUsers.filter((item) => item.institucion_nombre === session.institution);
+                  const others = simectUsers.filter((item) => item.institucion_nombre !== session.institution);
+                  const otherInstitutions = Array.from(new Set(others.map((item) => item.institucion_nombre))).sort((a, b) => a.localeCompare(b, 'es'));
+                  const option = (item: SimectUser) => <option key={`${item.institucion_nombre}|${item.usuario}`} value={item.usuario} disabled={item.usuario === session.studentPseudonym}>{item.usuario} · {`${item.nombres} ${item.apellidos}`.trim()}</option>;
+                  return (
+                    <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
+                      <label htmlFor={`student-edit-${session.id}`} className="block text-sm font-bold text-slate-900">Estudiante correcto</label>
+                      <select id={`student-edit-${session.id}`} value={studentEdit.code} onChange={(event) => setStudentEdit({ sessionId: session.id, code: event.target.value })} className="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900">
+                        <option value="" disabled>{simectUsers.length ? 'Selecciona el estudiante' : 'Cargando estudiantes de SIMECT…'}</option>
+                        <optgroup label={`${session.institution} (misma institución)`}>{sameInstitution.map(option)}</optgroup>
+                        {otherInstitutions.map((name) => <optgroup key={name} label={name}>{others.filter((item) => item.institucion_nombre === name).map(option)}</optgroup>)}
+                      </select>
+                      <p className="text-xs text-slate-600">Actual: <strong className="font-mono">{session.studentPseudonym || 'sin código'}</strong>. Solo cambia a quién corresponde el formulario (y su institución, si el estudiante es de otra); las respuestas y audios no se tocan.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" disabled={!studentEdit.code || studentEditBusy} onClick={() => void changeStudent(session, studentEdit.code)} className="inline-flex min-h-11 items-center rounded-xl bg-indigo-700 px-4 text-sm font-bold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50">{studentEditBusy ? 'Guardando…' : 'Guardar cambio'}</button>
+                        <button type="button" onClick={() => setStudentEdit(null)} className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancelar</button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-4">
                   {sortedQuestions(session.instrumentType).map((question) => {

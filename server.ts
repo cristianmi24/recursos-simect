@@ -450,31 +450,112 @@ app.post('/api/admin/institutions/apply', writeLimiter, allowSameOrigin, async (
   }
 });
 
+// Corregir el estudiante de un formulario ya enviado (entrevista u observación). Solo administración.
+// El código debe existir hoy en SIMECT; la institución pasa a ser la de ese estudiante.
+// Respuestas, audios y transcripciones quedan igual. Se deja constancia para avisar al tutor.
+app.post('/api/admin/sessions/:id/student', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql || !requireAdmin(user, res)) return;
+  const code = typeof req.body?.studentCode === 'string' ? req.body.studentCode.trim() : '';
+  if (!SESSION_ID_PATTERN.test(req.params.id) || !code || code.length > 80) {
+    res.status(400).json({ error: 'Elige el estudiante correcto.' });
+    return;
+  }
+  try {
+    const rows = await sql`SELECT id, instrument_type, instrument_code, payload FROM research_sessions WHERE id = ${req.params.id}::uuid`;
+    const row = rows[0] as Record<string, unknown> | undefined;
+    if (!row) {
+      res.status(404).json({ error: 'No se encontró el formulario.' });
+      return;
+    }
+    if (row.instrument_type !== 'E' && row.instrument_type !== 'OBS') {
+      res.status(400).json({ error: 'Solo se puede cambiar el estudiante de entrevistas y observaciones.' });
+      return;
+    }
+    const payload = parseJsonObject(row.payload) || {};
+    const previous = String(payload.studentPseudonym ?? '');
+    if (previous === code) {
+      res.status(400).json({ error: 'Ese ya es el estudiante del formulario.' });
+      return;
+    }
+    const matches = (await freshSimectUsers()).filter((item) => item.usuario === code);
+    if (matches.length === 0) {
+      res.status(400).json({ error: 'Ese código no existe en SIMECT.' });
+      return;
+    }
+    if (new Set(matches.map((item) => item.institucion_nombre)).size > 1) {
+      res.status(409).json({ error: 'Ese código aparece en varias instituciones de SIMECT; revísalo allí primero.' });
+      return;
+    }
+    const institution = matches[0].institucion_nombre;
+    const change = {
+      from: previous, to: code, fromInstitution: String(payload.institution ?? ''), toInstitution: institution,
+      changedAt: new Date().toISOString(), changedBy: user.name
+    };
+    const updated = await sql`
+      UPDATE research_sessions
+      SET payload = jsonb_set(jsonb_set(jsonb_set(payload, '{studentPseudonym}', to_jsonb(${code}::text)), '{institution}', to_jsonb(${institution}::text)), '{studentChange}', ${JSON.stringify(change)}::jsonb),
+          updated_at = NOW()
+      WHERE id = ${req.params.id}::uuid AND COALESCE(payload->>'studentPseudonym', '') = ${previous}
+      RETURNING id
+    `;
+    if (!updated[0]) {
+      res.status(409).json({ error: 'El formulario cambió mientras tanto. Recarga e inténtalo de nuevo.' });
+      return;
+    }
+    await writeAuditEvent(user, {
+      action: 'update_session', entityType: 'session', entityId: String(row.id),
+      summary: `Estudiante corregido en ${String(row.instrument_code)}: ${previous || 'sin código'} → ${code}${change.fromInstitution !== institution ? ` (institución: «${change.fromInstitution}» → «${institution}»)` : ''}`
+    }).catch(() => null);
+    res.json({ ok: true, studentPseudonym: code, institution });
+  } catch (error) {
+    if ((error as { status?: number })?.status === 503) {
+      res.status(503).json({ error: (error as Error).message });
+      return;
+    }
+    responseError(res, error, 'No se pudo cambiar el estudiante del formulario.');
+  }
+});
+
 // Avisos para quien llenó el formulario: Administración le cambió la institución según SIMECT.
 app.get('/api/notices', async (req, res) => {
   const user = await requireUser(req, res);
   if (!user || !sql) return;
   try {
     const rows = await sql`
-      SELECT id, instrument_type, instrument_code, payload->'institutionChange' AS change,
+      SELECT id, instrument_type, instrument_code,
+             CASE WHEN payload->'institutionChange'->>'acknowledgedAt' IS NULL THEN payload->'institutionChange' END AS institution_change,
+             CASE WHEN payload->'studentChange'->>'acknowledgedAt' IS NULL THEN payload->'studentChange' END AS student_change,
              payload->>'studentPseudonym' AS student, payload->'participantPseudonyms' AS participants
       FROM research_sessions
-      WHERE owner_id = ${user.id} AND payload ? 'institutionChange'
-        AND payload->'institutionChange'->>'acknowledgedAt' IS NULL
+      WHERE owner_id = ${user.id}
+        AND ((payload ? 'institutionChange' AND payload->'institutionChange'->>'acknowledgedAt' IS NULL)
+          OR (payload ? 'studentChange' AND payload->'studentChange'->>'acknowledgedAt' IS NULL))
       ORDER BY updated_at DESC LIMIT 50
     `;
-    const notices = (rows as Record<string, unknown>[]).map((row) => {
-      const change = parseJsonObject(row.change) || {};
+    // Un aviso por cambio: de institución (según SIMECT) o de estudiante (corrección de Administración).
+    const notices = (rows as Record<string, unknown>[]).flatMap((row) => {
       const participants = Array.isArray(row.participants) ? row.participants.map(String) : [];
-      return {
+      const base = {
         sessionId: String(row.id),
         instrumentType: String(row.instrument_type),
         instrumentCode: String(row.instrument_code),
-        codes: row.instrument_type === 'GF' ? participants : row.student ? [String(row.student)] : [],
-        from: String(change.from ?? ''),
-        to: String(change.to ?? ''),
-        changedAt: String(change.changedAt ?? '')
+        codes: row.instrument_type === 'GF' ? participants : row.student ? [String(row.student)] : []
       };
+      const items = [];
+      const studentChange = parseJsonObject(row.student_change);
+      if (studentChange) {
+        items.push({
+          ...base, kind: 'student', from: String(studentChange.from ?? ''), to: String(studentChange.to ?? ''),
+          fromInstitution: String(studentChange.fromInstitution ?? ''), toInstitution: String(studentChange.toInstitution ?? ''),
+          changedAt: String(studentChange.changedAt ?? '')
+        });
+      }
+      const institutionChange = parseJsonObject(row.institution_change);
+      if (institutionChange) {
+        items.push({ ...base, kind: 'institution', from: String(institutionChange.from ?? ''), to: String(institutionChange.to ?? ''), changedAt: String(institutionChange.changedAt ?? '') });
+      }
+      return items;
     });
     res.json({ notices });
   } catch (error) {
@@ -492,10 +573,16 @@ app.post('/api/notices/ack', writeLimiter, allowSameOrigin, async (req, res) => 
   }
   try {
     // Solo quien llenó el formulario marca el aviso como leído.
+    const now = new Date().toISOString();
     await sql`
       UPDATE research_sessions
-      SET payload = jsonb_set(payload, '{institutionChange,acknowledgedAt}', to_jsonb(${new Date().toISOString()}::text))
+      SET payload = jsonb_set(payload, '{institutionChange,acknowledgedAt}', to_jsonb(${now}::text))
       WHERE owner_id = ${user.id} AND id::text = ANY(${ids}) AND payload ? 'institutionChange'
+    `;
+    await sql`
+      UPDATE research_sessions
+      SET payload = jsonb_set(payload, '{studentChange,acknowledgedAt}', to_jsonb(${now}::text))
+      WHERE owner_id = ${user.id} AND id::text = ANY(${ids}) AND payload ? 'studentChange'
     `;
     res.json({ ok: true });
   } catch (error) {

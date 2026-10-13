@@ -337,6 +337,115 @@ async function fetchSimectUsers(baseUrl: string, apiKey: string): Promise<Simect
   })).filter((row) => row.usuario && row.institucion_nombre);
 }
 
+// ---- Verificación de instituciones contra SIMECT (solo administración) ----
+// En SIMECT un estudiante puede cambiar de institución. Se compara la institución guardada en cada
+// formulario con la actual del estudiante en SIMECT; al aplicar, solo cambia el nombre de la institución.
+const SESSION_ID_PATTERN = /^[0-9a-fA-F-]{36}$/;
+type InstitutionCheck = {
+  sessionId: string;
+  instrumentCode: string;
+  instrumentType: string;
+  codes: string[];
+  currentInstitution: string;
+  newInstitution?: string;
+  status: 'changed' | 'mixed' | 'not_found';
+};
+
+async function freshSimectUsers(): Promise<SimectUser[]> {
+  const baseUrl = process.env.SIMECT_API_URL?.trim().replace(/\/$/, '');
+  const apiKey = process.env.SIMECT_API_KEY?.trim();
+  if (!baseUrl || !apiKey) throw Object.assign(new Error('La integración con SIMECT no está configurada.'), { status: 503 });
+  simectInFlight ??= fetchSimectUsers(baseUrl, apiKey).finally(() => { simectInFlight = null; });
+  const data = await simectInFlight;
+  simectCache = { at: Date.now(), data };
+  return data;
+}
+
+function checkInstitution(row: Record<string, unknown>, institutionsByCode: Map<string, Set<string>>): InstitutionCheck | null {
+  const payload = parseJsonObject(row.payload) || {};
+  const currentInstitution = String(payload.institution ?? '');
+  const codes = row.instrument_type === 'GF'
+    ? (Array.isArray(payload.participantPseudonyms) ? payload.participantPseudonyms.map(String) : [])
+    : (typeof payload.studentPseudonym === 'string' && payload.studentPseudonym ? [payload.studentPseudonym] : []);
+  if (codes.length === 0) return null;
+  const found = codes.map((code) => institutionsByCode.get(code)).filter((set): set is Set<string> => Boolean(set));
+  const base = { sessionId: String(row.id), instrumentCode: String(row.instrument_code), instrumentType: String(row.instrument_type), codes, currentInstitution };
+  if (found.length === 0) return { ...base, status: 'not_found' };
+  // Si algún estudiante sigue en la institución guardada, no hay cambio que aplicar.
+  if (found.some((set) => set.has(currentInstitution))) return null;
+  const candidates = new Set(found.flatMap((set) => Array.from(set)));
+  if (candidates.size !== 1 || found.length !== codes.length) return { ...base, status: 'mixed' };
+  return { ...base, newInstitution: Array.from(candidates)[0], status: 'changed' };
+}
+
+async function institutionChecks(sessionIds?: string[]): Promise<InstitutionCheck[]> {
+  if (!sql) return [];
+  const users = await freshSimectUsers();
+  const institutionsByCode = new Map<string, Set<string>>();
+  for (const item of users) {
+    const set = institutionsByCode.get(item.usuario) || new Set<string>();
+    set.add(item.institucion_nombre);
+    institutionsByCode.set(item.usuario, set);
+  }
+  const rows = sessionIds
+    ? await sql`SELECT id, instrument_type, instrument_code, payload FROM research_sessions WHERE id::text = ANY(${sessionIds})`
+    : await sql`SELECT id, instrument_type, instrument_code, payload FROM research_sessions ORDER BY created_at DESC LIMIT ${sessionListLimit}`;
+  return (rows as Record<string, unknown>[])
+    .map((row) => checkInstitution(row, institutionsByCode))
+    .filter((item): item is InstitutionCheck => Boolean(item));
+}
+
+app.get('/api/admin/institutions/check', async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql || !requireAdmin(user, res)) return;
+  try {
+    const checks = await institutionChecks();
+    res.json({ checks, checkedAt: new Date().toISOString() });
+  } catch (error) {
+    if ((error as { status?: number })?.status === 503) {
+      res.status(503).json({ error: (error as Error).message });
+      return;
+    }
+    console.error('No se pudo verificar las instituciones.', error instanceof Error ? error.message : 'Error desconocido');
+    res.status(502).json({ error: 'No se pudo consultar SIMECT para verificar las instituciones.' });
+  }
+});
+
+app.post('/api/admin/institutions/apply', writeLimiter, allowSameOrigin, async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user || !sql || !requireAdmin(user, res)) return;
+  const ids = Array.isArray(req.body?.sessionIds) ? req.body.sessionIds.filter((id: unknown): id is string => typeof id === 'string' && SESSION_ID_PATTERN.test(id)) : [];
+  if (ids.length === 0 || ids.length > 500) {
+    res.status(400).json({ error: 'Indica los formularios que quieres actualizar.' });
+    return;
+  }
+  try {
+    // Se recalcula en el servidor con datos frescos de SIMECT: el navegador no decide la institución.
+    const checks = (await institutionChecks(ids)).filter((item) => item.status === 'changed' && item.newInstitution);
+    const updated: { sessionId: string; institution: string }[] = [];
+    for (const item of checks) {
+      const rows = await sql`
+        UPDATE research_sessions SET payload = jsonb_set(payload, '{institution}', to_jsonb(${item.newInstitution}::text)), updated_at = NOW()
+        WHERE id = ${item.sessionId}::uuid AND payload->>'institution' = ${item.currentInstitution}
+        RETURNING id
+      `;
+      if (!rows[0]) continue;
+      updated.push({ sessionId: item.sessionId, institution: item.newInstitution! });
+      await writeAuditEvent(user, {
+        action: 'update_session', entityType: 'session', entityId: item.sessionId,
+        summary: `Institución actualizada según SIMECT en ${item.instrumentCode}: «${item.currentInstitution}» → «${item.newInstitution}»`
+      }).catch(() => null);
+    }
+    res.json({ updated });
+  } catch (error) {
+    if ((error as { status?: number })?.status === 503) {
+      res.status(503).json({ error: (error as Error).message });
+      return;
+    }
+    responseError(res, error, 'No se pudieron actualizar las instituciones.');
+  }
+});
+
 app.get('/api/auth/session', async (req, res) => {
   if (!sql) {
     res.json({ user: null, configured: false });

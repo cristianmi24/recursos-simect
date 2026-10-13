@@ -15,6 +15,8 @@ import {
   Languages,
   ArrowLeft,
   Search,
+  RefreshCw,
+  ArrowRight,
   Trash2,
   Users
 } from 'lucide-react';
@@ -125,7 +127,7 @@ const safeName = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '_').replace
 const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export const DashboardView: React.FC = () => {
-  const { sessions, questions, categories, transcriptionServerBusy: serverBusy, transcribingKey: transcribing, transcriptionProgress: transcribeProgress, transcriptionMessage: transcribeMessage, startTranscription, deleteSession } = useProject();
+  const { sessions, questions, categories, transcriptionServerBusy: serverBusy, transcribingKey: transcribing, transcriptionProgress: transcribeProgress, transcriptionMessage: transcribeMessage, startTranscription, deleteSession, refreshSessions } = useProject();
   const [simectUsers, setSimectUsers] = useState<SimectUser[]>([]);
   const [search, setSearch] = useState('');
   // La institución y el estudiante abiertos viven en la URL: /panel/<institución>/<código>.
@@ -143,6 +145,11 @@ export const DashboardView: React.FC = () => {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
   const [zipProgress, setZipProgress] = useState('');
+  // Verificación de instituciones contra SIMECT (un estudiante puede haber cambiado de institución).
+  type InstitutionCheck = { sessionId: string; instrumentCode: string; instrumentType: InstrumentType; codes: string[]; currentInstitution: string; newInstitution?: string; status: 'changed' | 'mixed' | 'not_found' };
+  const [institutionChecks, setInstitutionChecks] = useState<InstitutionCheck[] | null>(null);
+  const [checkState, setCheckState] = useState<'idle' | 'checking' | 'applying'>('idle');
+  const [checkMessage, setCheckMessage] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -352,6 +359,51 @@ export const DashboardView: React.FC = () => {
     }
   };
 
+  const verifyInstitutions = async () => {
+    setCheckState('checking');
+    setCheckMessage('');
+    try {
+      const response = await fetch('/api/admin/institutions/check', { credentials: 'same-origin', cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudo verificar con SIMECT.');
+      setInstitutionChecks(data.checks as InstitutionCheck[]);
+    } catch (error) {
+      setCheckMessage(error instanceof Error ? error.message : 'No se pudo verificar con SIMECT.');
+    } finally {
+      setCheckState('idle');
+    }
+  };
+
+  const applyInstitutions = async (items: InstitutionCheck[]) => {
+    if (items.length === 0) return;
+    const ok = await dialog.confirm({
+      title: items.length === 1 ? `¿Actualizar la institución de ${items[0].instrumentCode}?` : `¿Actualizar la institución de ${items.length} formularios?`,
+      message: 'Solo cambia el nombre de la institución por el que tiene hoy el estudiante en SIMECT. Las respuestas, audios, transcripciones y demás datos quedan igual. El cambio queda en la bitácora.',
+      confirmLabel: 'Actualizar'
+    });
+    if (!ok) return;
+    setCheckState('applying');
+    setCheckMessage('');
+    try {
+      const response = await fetch('/api/admin/institutions/apply', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionIds: items.map((item) => item.sessionId) })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'No se pudieron actualizar las instituciones.');
+      const updated = new Set((data.updated as { sessionId: string }[]).map((item) => item.sessionId));
+      setInstitutionChecks((current) => current?.filter((item) => !updated.has(item.sessionId)) ?? null);
+      setCheckMessage(`Se actualizaron ${updated.size} ${updated.size === 1 ? 'formulario' : 'formularios'}.`);
+      await refreshSessions();
+    } catch (error) {
+      setCheckMessage(error instanceof Error ? error.message : 'No se pudieron actualizar las instituciones.');
+    } finally {
+      setCheckState('idle');
+    }
+  };
+
   const pendingAudios = (list: ResearchSession[]) =>
     list
       .filter((session) => session.instrumentType === 'E' || session.instrumentType === 'GF')
@@ -443,6 +495,52 @@ export const DashboardView: React.FC = () => {
           className="min-h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-600"
         />
       </div>
+
+      <section aria-label="Verificar instituciones con SIMECT" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900">Instituciones según SIMECT</h2>
+            <p className="text-xs text-slate-500">Si un estudiante cambió de institución en SIMECT, aquí lo ves y puedes actualizar solo el nombre de la institución en sus formularios.</p>
+          </div>
+          <button type="button" onClick={() => void verifyInstitutions()} disabled={checkState !== 'idle'} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-indigo-300 bg-white px-4 text-sm font-bold text-indigo-900 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${checkState === 'checking' ? 'animate-spin' : ''}`} aria-hidden="true" /> {checkState === 'checking' ? 'Verificando…' : 'Verificar con SIMECT'}
+          </button>
+        </div>
+        {checkMessage && <p role="status" className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">{checkMessage}</p>}
+        {institutionChecks && (() => {
+          const changed = institutionChecks.filter((item) => item.status === 'changed');
+          const others = institutionChecks.filter((item) => item.status !== 'changed');
+          if (institutionChecks.length === 0) return <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Todo coincide: ningún estudiante cambió de institución.</p>;
+          return (
+            <div className="mt-4 space-y-3">
+              {changed.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-amber-900">{changed.length} {changed.length === 1 ? 'formulario tiene' : 'formularios tienen'} una institución distinta a la de SIMECT.</p>
+                  {changed.length > 1 && <button type="button" onClick={() => void applyInstitutions(changed)} disabled={checkState !== 'idle'} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-indigo-700 px-3 text-xs font-bold text-white hover:bg-indigo-800 disabled:opacity-50">Actualizar todas ({changed.length})</button>}
+                </div>
+              )}
+              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                {[...changed, ...others].map((item) => (
+                  <li key={item.sessionId} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${TYPE_STYLE[item.instrumentType]}`}>{item.instrumentType}</span>
+                    <span className="font-mono text-xs font-bold text-slate-700">{item.instrumentCode}</span>
+                    <span className="font-mono text-xs text-indigo-700">{item.codes.join(', ')}</span>
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-slate-700">
+                      <span className="line-through decoration-slate-400">{item.currentInstitution}</span>
+                      {item.status === 'changed' && <><ArrowRight className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /><strong className="text-slate-900">{item.newInstitution}</strong></>}
+                      {item.status === 'mixed' && <span className="text-xs font-semibold text-amber-800">· los participantes ahora están en instituciones distintas; revísalo a mano</span>}
+                      {item.status === 'not_found' && <span className="text-xs font-semibold text-slate-500">· el estudiante ya no aparece en SIMECT; no se cambia nada</span>}
+                    </span>
+                    {item.status === 'changed' && (
+                      <button type="button" onClick={() => void applyInstitutions([item])} disabled={checkState !== 'idle'} className="inline-flex min-h-10 items-center rounded-lg border border-indigo-300 px-3 text-xs font-bold text-indigo-900 hover:bg-indigo-50 disabled:opacity-50">Actualizar</button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
+      </section>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

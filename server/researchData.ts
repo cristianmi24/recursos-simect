@@ -32,7 +32,7 @@ function text(value: unknown, field: string, max: number, required = false): Val
 }
 
 // audio/<id de usuario>/<uuid>.<ext>: la clave solo la genera el servidor.
-export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/(?:[A-Za-z0-9-]{1,40}_(?:E|GF)[1-9][0-9]?_)?[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
+export const AUDIO_KEY = /^audio\/[0-9a-f-]{36}\/(?:[A-Za-z0-9-]{1,40}_(?:E|GF)[1-9][0-9]?_)?[0-9a-f-]{36}\.(mp3|webm|ogg|m4a|mp4)$/;
 
 // Campos de audio comunes a entrevista y grupo focal.
 function cleanAudio(raw: JsonRecord): ValidationResult<{ audioKey?: string; audioMime?: string; audioSeconds?: number; transcribedAt?: string }> {

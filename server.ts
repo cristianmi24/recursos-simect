@@ -673,7 +673,7 @@ const r2Client = process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && pr
       credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID.trim(), secretAccessKey: process.env.R2_SECRET_ACCESS_KEY.trim() }
     })
   : null;
-const audioExtensions: Record<string, string> = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a' };
+const audioExtensions: Record<string, string> = { 'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a' };
 
 app.post('/api/audio/upload-url', writeLimiter, allowSameOrigin, async (req, res) => {
   const user = await requireUser(req, res);
@@ -766,7 +766,7 @@ const qwenModel = process.env.QWEN_ASR_MODEL?.trim() || 'qwen3-asr-flash-filetra
 // Las entrevistas son en español: se fuerza el idioma para evitar transcripciones en chino o portugués.
 const qwenLanguage = process.env.QWEN_ASR_LANGUAGE?.trim() || 'es';
 const TASK_ID = /^[0-9a-fA-F-]{36}$/;
-const TEMP_KEY = /^tmp\/[0-9a-f-]{36}\.(webm|ogg|m4a|mp4)$/;
+const TEMP_KEY = /^tmp\/[0-9a-f-]{36}\.(mp3|webm|ogg|m4a|mp4)$/;
 const SESSION_ID = /^[0-9a-fA-F-]{36}$/;
 const jobMaxMinutes = 20;
 const QUOTA_PATTERN = /arrearage|insufficient|quota|balance|free.?tier|overdue|billing|credit/i;

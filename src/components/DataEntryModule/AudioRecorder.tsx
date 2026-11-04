@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import fixWebmDuration from 'fix-webm-duration';
 import { Check, Loader2, Mic, RotateCcw, Square, Trash2 } from 'lucide-react';
+import { toMp3 } from '../../utils/mp3Encoder';
 import { AUDIO_FAILED, AUDIO_UPLOADED, deleteRecording, getRecording, isUploading, processQueue, putRecording, recordingBlob } from '../../utils/audioQueue';
 
 const MAX_SECONDS = 900;
@@ -53,7 +54,7 @@ export const AudioRecorder: React.FC<Props> = ({
   missingCodeHint = 'Selecciona al estudiante en los datos generales para poder grabar: el audio se guarda con su código.'
 }) => {
   // idle: sin acción · recording: grabando · uploading: subiendo · waiting: aceptado, esperando conexión
-  const [status, setStatus] = useState<'idle' | 'recording' | 'uploading' | 'waiting'>('idle');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'converting' | 'uploading' | 'waiting'>('idle');
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -91,15 +92,18 @@ export const AudioRecorder: React.FC<Props> = ({
       const stored = await getRecording(storageId);
       if (!active || !stored || stored.chunks.length === 0) return;
       let blob = recordingBlob(stored);
+      let mime = stored.mime;
       if (stored.status === 'recording') {
         if (stored.mime === 'audio/webm') {
           try { blob = await fixWebmDuration(blob, stored.seconds * 1000, { logger: false }); } catch { /* se usa tal cual */ }
         }
-        await putRecording({ ...stored, status: 'review', chunks: [blob] });
+        const mp3 = mime === 'audio/mpeg' ? null : await toMp3(blob);
+        if (mp3) { blob = mp3; mime = 'audio/mpeg'; }
+        await putRecording({ ...stored, mime, status: 'review', chunks: [blob] });
         if (!active) return;
         setNotice('Se recuperó una grabación que se interrumpió. Escúchala y decide si la guardas.');
       }
-      setPending({ blob, mime: stored.mime, seconds: stored.seconds, url: URL.createObjectURL(blob) });
+      setPending({ blob, mime, seconds: stored.seconds, url: URL.createObjectURL(blob) });
       setSeconds(stored.seconds);
       if (stored.status === 'queued') {
         setStatus(isUploading(storageId) ? 'uploading' : 'waiting');
@@ -197,10 +201,15 @@ export const AudioRecorder: React.FC<Props> = ({
         if (baseMime === 'audio/webm') {
           try { blob = await fixWebmDuration(blob, durationMs, { logger: false }); } catch { /* se guarda tal cual */ }
         }
+        // Se guarda siempre en MP3 (si el navegador no puede convertirlo, queda el formato original).
+        setStatus('converting');
+        let finalMime = baseMime;
+        const mp3 = await toMp3(blob);
+        if (mp3) { blob = mp3; finalMime = 'audio/mpeg'; }
         const recordedSeconds = Math.max(1, Math.round(durationMs / 1000));
-        await putRecording({ ...base, seconds: recordedSeconds, status: 'review', chunks: [blob] });
+        await putRecording({ ...base, mime: finalMime, seconds: recordedSeconds, status: 'review', chunks: [blob] });
         setStatus('idle');
-        setPending({ blob, mime: baseMime, seconds: recordedSeconds, url: URL.createObjectURL(blob) });
+        setPending({ blob, mime: finalMime, seconds: recordedSeconds, url: URL.createObjectURL(blob) });
       };
       startedAtRef.current = Date.now();
       recorder.start(4000);
@@ -243,7 +252,7 @@ export const AudioRecorder: React.FC<Props> = ({
       {notice && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">{notice}</p>}
 
       <div className="flex flex-wrap items-center gap-2">
-        {status !== 'recording' && !hasAudio && !pending && (
+        {status !== 'recording' && status !== 'converting' && !hasAudio && !pending && (
           <button type="button" onClick={() => void start()} disabled={!consentApproved || !studentCode} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50">
             <Mic size={16} aria-hidden="true" /> Grabar audio
           </button>
@@ -263,6 +272,7 @@ export const AudioRecorder: React.FC<Props> = ({
             </button>
           </>
         )}
+        {status === 'converting' && <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Convirtiendo a MP3…</span>}
         {status === 'uploading' && <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Guardando audio…</span>}
         {status === 'waiting' && (
           <button type="button" onClick={() => { setStatus('uploading'); setError(''); void processQueue(storageId); }} className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-950 hover:bg-amber-100">

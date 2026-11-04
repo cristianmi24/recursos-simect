@@ -22,6 +22,7 @@ import {
   Users
 } from 'lucide-react';
 import { zipSync } from 'fflate';
+import { toMp3 } from '../../utils/mp3Encoder';
 import { useProject } from '../../context/ProjectContext';
 import type { InstrumentType, QuestionDefinition, ResearchSession } from '../../types';
 import { SessionDetailModal } from '../InstrumentsModule/SessionDetailModal';
@@ -238,17 +239,26 @@ export const DashboardView: React.FC = () => {
     setMessage('');
     try {
       for (const audio of audios) {
-        const extension = audio.key.split('.').pop() || 'webm';
-        const name = `${audioOwnerOf(session)}_${audio.questionId}.${extension}`;
-        const response = await fetch(`/api/audio/url?key=${encodeURIComponent(audio.key)}&download=1&name=${encodeURIComponent(name)}`, { credentials: 'same-origin' });
+        let extension = audio.key.split('.').pop() || 'webm';
+        const response = await fetch(`/api/audio/url?key=${encodeURIComponent(audio.key)}&download=1`, { credentials: 'same-origin' });
         if (!response.ok) throw new Error('audio');
         const { url } = (await response.json()) as { url: string };
+        let href = url;
+        let revoke = false;
+        if (extension !== 'mp3') {
+          const file = await fetch(url);
+          if (!file.ok) throw new Error('file');
+          const mp3 = await toMp3(await file.blob());
+          if (mp3) { href = URL.createObjectURL(mp3); revoke = true; extension = 'mp3'; }
+        }
+        const name = `${audioOwnerOf(session)}_${audio.questionId}.${extension}`;
         const anchor = document.createElement('a');
-        anchor.href = url;
+        anchor.href = href;
         anchor.download = name;
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
+        if (revoke) window.setTimeout(() => URL.revokeObjectURL(href), 5000);
         await pause(600);
       }
     } catch {
@@ -304,13 +314,20 @@ export const DashboardView: React.FC = () => {
         const { url } = (await signed.json()) as { url: string };
         const file = await fetch(url);
         if (!file.ok) throw new Error('file');
-        const extension = audio.key.split('.').pop() || 'webm';
+        let extension = audio.key.split('.').pop() || 'webm';
+        let bytes = new Uint8Array(await file.arrayBuffer());
+        // Todo audio va al ZIP en MP3, también los guardados antes en WebM.
+        if (extension !== 'mp3') {
+          setZipProgress(`Convirtiendo a MP3… ${index + 1} de ${items.length}`);
+          const mp3 = await toMp3(new Blob([bytes]));
+          if (mp3) { bytes = new Uint8Array(await mp3.arrayBuffer()); extension = 'mp3'; }
+        }
         const code = audioOwnerOf(session);
         const category = categoryOf(audio.questionId);
         const folder = options.layout === 'category'
           ? `${safeName(category?.family || 'Sin categoría')}/${safeName(category?.name || 'Sin subcategoría')}`
           : `${safeName(session.institution)}/${session.instrumentType === 'GF' ? 'grupos_focales' : safeName(code)}`;
-        files[`${folder}/${safeName(code)}_${audio.questionId}.${extension}`] = new Uint8Array(await file.arrayBuffer());
+        files[`${folder}/${safeName(code)}_${audio.questionId}.${extension}`] = bytes;
       }
       setZipProgress('Comprimiendo…');
       await pause(50);
